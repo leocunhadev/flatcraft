@@ -1,103 +1,238 @@
 import './style.css'
 import { PerlinNoise } from './perlin'
+// @ts-ignore
+import textureUrl from './imagens/texturas_terrenos.png'
 
 const canvas = document.getElementById('mapCanvas') as HTMLCanvasElement;
 const ctx = canvas.getContext('2d')!;
 const regenerateBtn = document.getElementById('regenerateBtn') as HTMLButtonElement;
 const scaleInput = document.getElementById('scaleInput') as HTMLInputElement;
 const offsetInput = document.getElementById('offsetInput') as HTMLInputElement;
+const warpInput = document.getElementById('warpInput') as HTMLInputElement;
 
-const WIDTH = 32;
-const HEIGHT = 32;
+const WIDTH = 256;
+const HEIGHT = 256;
 
-// Initialize Noise
-let noise = new PerlinNoise();
+// Sync canvas internal resolution
+canvas.width = WIDTH;
+canvas.height = HEIGHT;
 
-// Color Palette (Hex)
-const COLORS = {
-  deepWater: '#1e3a8a', // blue-900
-  water: '#3b82f6',     // blue-500
-  sand: '#fde047',      // yellow-300
-  grass: '#22c55e',     // green-500
-  forest: '#15803d',    // green-700
-  rock: '#78716c',      // stone-500
-  snow: '#f8fafc',      // slate-50
+// Initialize Noise Layers
+let noiseHeight = new PerlinNoise();
+let noiseTemp = new PerlinNoise();
+
+// Texture Management
+const terrainImage = new Image();
+let terrainData: Uint8ClampedArray | null = null;
+let spriteSize = 16;
+const spritesPerRow = 5; // Based on the provided 5x3 grid image
+
+terrainImage.onload = () => {
+  const offCanvas = document.createElement('canvas');
+  offCanvas.width = terrainImage.width;
+  offCanvas.height = terrainImage.height;
+  const offCtx = offCanvas.getContext('2d')!;
+  offCtx.drawImage(terrainImage, 0, 0);
+  // Calculate sprite size based on 5 columns
+  spriteSize = terrainImage.width / spritesPerRow;
+  if (Math.floor(spriteSize) !== spriteSize) {
+    console.warn("Sprite size is non-integer, check image dimensions and biome count.");
+  }
+  terrainData = offCtx.getImageData(0, 0, terrainImage.width, terrainImage.height).data;
+  generate();
+};
+terrainImage.src = textureUrl;
+
+// Ensure we don't try to generate before load, though generate() checks terrainData.
+
+// Biome Indices (Order defined by left-to-right image position)
+const BIOMES = {
+  deepOcean: 0,
+  ocean: 1,
+  beach: 2,
+
+  snow: 3,
+  tundra: 4,
+
+  grass: 5,
+  forest: 6,
+  jungle: 7,
+
+  savanna: 8,
+  desert: 9,
+  badlands: 10,
+
+  mountain: 11,
+  snowyMountain: 12
 };
 
-function getColor(value: number): string {
-  // Value is roughly -1 to 1, normalise to 0..1 sort of, or just threshold
-  // Perlin noise can go slightly outside -1..1 depending on implementation but usually around there.
+function getBiomeIndex(elevation: number, temperature: number): number {
+  // Elevation is now in range [-10, 10]
+  // Water Line is 6.0 (defines 50% mark)
 
-  if (value < -0.3) return COLORS.deepWater;
-  if (value < -0.05) return COLORS.water;
-  if (value < 0.05) return COLORS.sand;
-  if (value < 0.35) return COLORS.grass;
-  if (value < 0.6) return COLORS.forest;
-  if (value < 0.8) return COLORS.rock;
-  return COLORS.snow;
+  // WATER (h <= 6)
+  if (elevation <= 6.0) {
+    if (elevation < 1.0) return BIOMES.deepOcean; // Increased range for visibility
+    // if (elevation < 4.0) return BIOMES.ocean;      // -5 to 4
+    return BIOMES.ocean;
+  }
+
+  // LAND (h > 6)
+
+  // Beach/Sand: 6.0 to 6.4
+  if (elevation < 6.4) {
+    return temperature < 0.2 ? BIOMES.tundra : BIOMES.beach;
+  }
+
+  // Mountains: > 9.0
+  if (elevation > 9.0) {
+    if (temperature < 0.5) return BIOMES.snowyMountain;
+    return BIOMES.mountain;
+  }
+
+  // Standard Terrain (6.4 to 9.0)
+  // COLD
+  if (temperature < 0.3) return BIOMES.snow;
+  // COOL
+  if (temperature < 0.45) return BIOMES.tundra;
+  // TEMPERATE
+  if (temperature < 0.65) {
+    return BIOMES.forest; // Mostly forest
+  }
+  // WARM
+  if (temperature < 0.8) return BIOMES.savanna;
+  // HOT
+  return BIOMES.desert;
+}
+
+// Fractal Brownian Motion (Octaves)
+function fbm(x: number, y: number, octaves: number, persistence: number, lacunarity: number, noiseSource: PerlinNoise): number {
+  let total = 0;
+  let frequency = 1;
+  let amplitude = 1;
+  let maxValue = 0;
+
+  for (let i = 0; i < octaves; i++) {
+    total += noiseSource.noise(x * frequency, y * frequency, 0) * amplitude;
+    maxValue += amplitude;
+    amplitude *= persistence;
+    frequency *= lacunarity;
+  }
+
+  return total / maxValue;
 }
 
 function generate() {
-  const scale = parseFloat(scaleInput.value); // Controls zoom/frequency
-  const offset = parseFloat(offsetInput.value); // Moves the map
+  if (!terrainData) return; // Wait for texture
 
-  // Re-seed noise if needed?
-  // PerlinNoise class as written has fixed permutation on init.
-  // To get "new" maps we need new permutation or simple offset in noise space.
-  // We will use a random offset + slider offset for z or x/y.
+  const scale = parseFloat(scaleInput.value);
+  const userOffset = parseFloat(offsetInput.value);
+  const useWarp = warpInput.checked;
 
-  // Actually, to make "Regenerate" work, we should just instantiate new Noise or add a random seed offset.
-  // My Perlin implementation generates permutation in constructor. So new PerlinNoise() = new Seed.
+  // Elevation settings
+  const baseFreq = 0.03;
+  const frequency = baseFreq * (scale / 2);
+  const octaves = 4;
 
-  // We'll create a new noise instance only on Regenerate click, but preserve slider usage for pan/zoom?
-  // No, user wants "Regenerate". Let's use a global scalar offset for randomness.
+  // Temperature settings
+  const tempFrequency = frequency * 0.5;
 
-  ctx.clearRect(0, 0, WIDTH, HEIGHT);
+  // Prepare Output Data
+  const canvasData = ctx.createImageData(WIDTH, HEIGHT);
+  const outputData = canvasData.data;
+
+  // Texture dimensions
+  const texWidth = terrainImage.width;
+  // const texHeight = terrainImage.height;
 
   for (let y = 0; y < HEIGHT; y++) {
     for (let x = 0; x < WIDTH; x++) {
-      // Scale coordinates.
-      // Higher scale input = Zoom IN? Or Zoom OUT?
-      // Usually Scale = Frequency. Higher Frequency = Zoom OUT (more noise).
-      // Let's make "Scale" input mean Zoom Level (so higher = larger features = lower frequency).
-      // freq = 1 / scale.
+      // 1. Get raw noise 0..1
+      let nx = (x + userOffset * 5) * frequency;
+      let ny = (y + userOffset * 5) * frequency;
 
-      const frequency = 10 / (scale * 5); // magic numbers to tune feel
+      // DOMAIN WARPING
+      if (useWarp) {
+        const qx = fbm(nx + 5.2, ny + 1.3, 2, 0.5, 2.0, noiseHeight);
+        const qy = fbm(nx + 1.3, ny + 2.8, 2, 0.5, 2.0, noiseHeight);
 
-      const nx = (x + offset * 10) * frequency;
-      const ny = (y + offset * 10) * frequency;
+        // Displace the coordinate
+        nx += 4.0 * qx * (scale / 10);
+        ny += 4.0 * qy * (scale / 10);
+      }
 
-      // Use offsetInput as a Z coordinate for animation/scrolling effect if desired,
-      // or just X/Y offset. Let's use it as X/Y offset index.
-      // But wait, "Offset" slider is usually for scrolling noise.
-      // "Regenerate" button should completely randomize the map.
+      let rawE = fbm(nx, ny, octaves, 0.5, 2.0, noiseHeight);
+      const nE = (rawE + 1) / 2; // 0..1
 
-      // Refined logic:
-      // Regenerate: Randomizes the internal Permutation table (new PerlinNoise).
-      // Offset Slider: Scrolls through the CURRENT map (modifies inputs to noise).
-      // Scale Slider: Zooms in/out (modifies input multiplier).
+      // 2. Map 0..1 to -10..10
+      let h = 0;
+      if (nE < 0.4) {
+        h = -10 + (nE / 0.4) * 16;
+      } else {
+        h = 6 + ((nE - 0.4) / 0.6) * 4;
+      }
 
-      const val = noise.noise(nx, ny, 0);
+      // 3. Temperature (Standard 0..1)
+      let nTx = (x + userOffset * 5 + 1000) * tempFrequency;
+      let nTy = (y + userOffset * 5 + 1000) * tempFrequency;
 
-      ctx.fillStyle = getColor(val);
-      ctx.fillRect(x, y, 1, 1);
+      if (useWarp) {
+        const qx = fbm(nTx, nTy, 2, 0.5, 2.0, noiseHeight);
+        const qy = fbm(nTx + 10, nTy + 10, 2, 0.5, 2.0, noiseHeight);
+        nTx += 2.0 * qx;
+        nTy += 2.0 * qy;
+      }
+
+      let rawT = fbm(nTx, nTy, 2, 0.5, 2.0, noiseTemp);
+      const t = (rawT + 1) / 2;
+
+      // Determine Biome
+      const biomeIndex = getBiomeIndex(h, t);
+
+      // Texture Mapping
+      // Calculate texture coordinate
+      // We tile the texture based on world coordinates (x, y)
+      const tileX = Math.floor(x % spriteSize);
+      const tileY = Math.floor(y % spriteSize);
+
+      // Grid Layout Logic (5 columns)
+      const col = biomeIndex % spritesPerRow;
+      const row = Math.floor(biomeIndex / spritesPerRow);
+
+      const srcX = Math.floor(col * spriteSize + tileX);
+      const srcY = Math.floor(row * spriteSize + tileY);
+
+      // Read from textureData
+      const srcIndex = (srcY * texWidth + srcX) * 4;
+
+      // Write to outputData
+      const paramIndex = (y * WIDTH + x) * 4;
+
+      // Copy RGBA
+      if (srcIndex < terrainData.length) {
+        outputData[paramIndex] = terrainData[srcIndex];
+        outputData[paramIndex + 1] = terrainData[srcIndex + 1];
+        outputData[paramIndex + 2] = terrainData[srcIndex + 2];
+        outputData[paramIndex + 3] = 255; // Alpha
+      }
     }
   }
+
+  ctx.putImageData(canvasData, 0, 0);
 }
 
-// Initial Generation
-generate();
+// Initial Generation - Managed by Image OnLoad
 
 // Event Listeners
 scaleInput.addEventListener('input', generate);
 offsetInput.addEventListener('input', generate);
+warpInput.addEventListener('change', generate);
 
 regenerateBtn.addEventListener('click', () => {
-  noise = new PerlinNoise(); // Reshuffles permutation
-  // specific user experience: Reset offset? Maybe keep it.
-  generate();
+  noiseHeight = new PerlinNoise();
+  noiseTemp = new PerlinNoise();
+  generate(); // Note: animation removed to keep simple logic intact with ImageData
 
-  // Add a nice visual pop to canvas
   canvas.style.transform = 'scale(0.95)';
   setTimeout(() => canvas.style.transform = 'scale(1)', 100);
 });

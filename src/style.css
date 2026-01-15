@@ -83,10 +83,15 @@ header p {
 
 canvas {
   display: block;
-  width: 320px;
-  height: 320px; /* Scaling up 32x32 to 320x320 visullay */
-  image-rendering: pixelated; /* Crucial for strict 1px look */
+  width: 100%;
+  max-width: 640px;
+  /* Double the previous visual size approx */
+  aspect-ratio: 1 / 1;
+  height: auto;
+  image-rendering: pixelated;
+  /* Crucial for strict 1px look */
   border-radius: 8px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
 
 .controls {
@@ -131,13 +136,40 @@ button:active {
   line-height: 1;
 }
 
+/* ... existing styles ... */
+
 .params {
   display: flex;
+  flex-direction: column;
+  /* Changed to column to stack checkbox and sliders */
   gap: 1rem;
-  justify-content: space-between;
+}
+
+.checkbox-group {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 0.8rem;
+  border-radius: 8px;
+  border: 1px solid var(--glass-border);
+}
+
+.checkbox-group input[type="checkbox"] {
+  width: 1.2rem;
+  height: 1.2rem;
+  accent-color: var(--accent-color);
+  cursor: pointer;
+}
+
+.checkbox-group label {
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  cursor: pointer;
 }
 
 .param-group {
+  /* ... */
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
@@ -176,16 +208,37 @@ input[type="range"]::-webkit-slider-thumb:hover {
 }
 
 @keyframes fadeInDown {
-  from { opacity: 0; transform: translateY(-20px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes scaleIn {
-  from { opacity: 0; transform: scale(0.9); }
-  to { opacity: 1; transform: scale(1); }
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
