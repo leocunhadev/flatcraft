@@ -135,7 +135,7 @@ function generate() {
   const octaves = 4;
 
   // Temperature settings
-  const tempFrequency = frequency * 0.5;
+  const tempFrequency = frequency * 0.15;
 
   // Prepare Output Data
   const canvasData = ctx.createImageData(WIDTH, HEIGHT);
@@ -148,17 +148,29 @@ function generate() {
   for (let y = 0; y < HEIGHT; y++) {
     for (let x = 0; x < WIDTH; x++) {
       // 1. Get raw noise 0..1
-      let nx = (x + userOffset * 5) * frequency;
-      let ny = (y + userOffset * 5) * frequency;
+      // Calculate base 'world' coordinates that scale with frequency (zoom)
+      // To ensure stable zooming (features don't drift), we multiply X by frequency first, THEN add the offset.
+      // This pins the "0,0" coordinate to the offset value, rather than sliding it as frequency changes.
+      const worldOffsetX = userOffset * 0.5; // Fixed world-space step
+      const worldOffsetY = userOffset * 0.5;
+
+      const unwarpedNx = (x * frequency) + worldOffsetX;
+      const unwarpedNy = (y * frequency) + worldOffsetY;
+
+      let nx = unwarpedNx;
+      let ny = unwarpedNy;
 
       // DOMAIN WARPING
       if (useWarp) {
+        // We use the noise itself to offset the coordinates
+        // q = fbm(p + ...)
+
         const qx = fbm(nx + 5.2, ny + 1.3, 2, 0.5, 2.0, noiseHeight);
         const qy = fbm(nx + 1.3, ny + 2.8, 2, 0.5, 2.0, noiseHeight);
 
         // Displace the coordinate
-        nx += 4.0 * qx * (scale / 10);
-        ny += 4.0 * qy * (scale / 10);
+        nx += 4.0 * qx * 0.5;
+        ny += 4.0 * qy * 0.5;
       }
 
       let rawE = fbm(nx, ny, octaves, 0.5, 2.0, noiseHeight);
@@ -173,8 +185,17 @@ function generate() {
       }
 
       // 3. Temperature (Standard 0..1)
-      let nTx = (x + userOffset * 5 + 1000) * tempFrequency;
-      let nTy = (y + userOffset * 5 + 1000) * tempFrequency;
+      // Same logic: Scale then Offset.
+      // Note: Temp uses the same offset logic to stay aligned, plus its own large constant shift (1000) for variety.
+      // We must scale the offset by the frequency ratio (0.15) if we want it to move at the same relative visual speed,
+      // OR we just use the same world coordinate system (simplest) but with different noise seed/offset.
+
+      // Let's use the exact same logic structure so "Zoom" affects them identically.
+      // nTx = (x * freq * 0.15) + (Offset + 1000) * 0.15 ???
+      // No, let's keep it simple: Temp is just a different layer on the same world.
+
+      let nTx = (x * tempFrequency) + (worldOffsetX * 0.15) + 1000;
+      let nTy = (y * tempFrequency) + (worldOffsetY * 0.15) + 1000;
 
       if (useWarp) {
         const qx = fbm(nTx, nTy, 2, 0.5, 2.0, noiseHeight);
@@ -190,10 +211,16 @@ function generate() {
       const biomeIndex = getBiomeIndex(h, t);
 
       // Texture Mapping
-      // Calculate texture coordinate
-      // We tile the texture based on world coordinates (x, y)
-      const tileX = Math.floor(x % spriteSize);
-      const tileY = Math.floor(y % spriteSize);
+      // Use UNWARPED noise Coordinates for tiling
+      // This ensures texture scales with zoom (locks to terrain size) but does NOT distort/swirl with the warp effect
+      const texScale = 64.0;
+
+      const worldX = Math.floor(unwarpedNx * texScale);
+      const worldY = Math.floor(unwarpedNy * texScale);
+
+      // Simple positive modulo
+      const tileX = ((worldX % spriteSize) + spriteSize) % spriteSize;
+      const tileY = ((worldY % spriteSize) + spriteSize) % spriteSize;
 
       // Grid Layout Logic (5 columns)
       const col = biomeIndex % spritesPerRow;
@@ -209,7 +236,7 @@ function generate() {
       const paramIndex = (y * WIDTH + x) * 4;
 
       // Copy RGBA
-      if (srcIndex < terrainData.length) {
+      if (srcIndex < terrainData.length && srcIndex >= 0) {
         outputData[paramIndex] = terrainData[srcIndex];
         outputData[paramIndex + 1] = terrainData[srcIndex + 1];
         outputData[paramIndex + 2] = terrainData[srcIndex + 2];
