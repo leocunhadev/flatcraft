@@ -23,23 +23,22 @@ export const BIOMES = {
 };
 
 export const BIOME_MOVEMENT_SPEEDS = {
-    [BIOMES.grass]: 0.8,
-    [BIOMES.forest]: 0.8,
-    [BIOMES.jungle]: 0.8,
-    [BIOMES.savanna]: 0.8,
-    [BIOMES.mountain]: 0.8,
-
-    [BIOMES.deepOcean]: 0.3,
-    [BIOMES.ocean]: 0.3,
-
-    [BIOMES.beach]: 0.7,
-
-    [BIOMES.desert]: 0.7,
-    [BIOMES.badlands]: 0.7,
+    [BIOMES.deepOcean]: 0.2,
+    [BIOMES.ocean]: 0.4,
 
     [BIOMES.tundra]: 0.5,
     [BIOMES.snow]: 0.5,
-    [BIOMES.snowyMountain]: 0.5
+    [BIOMES.snowyMountain]: 0.5,
+
+    [BIOMES.beach]: 0.6,
+    [BIOMES.desert]: 0.6,
+    [BIOMES.badlands]: 0.6,
+
+    [BIOMES.grass]: 0.7,
+    [BIOMES.forest]: 0.7,
+    [BIOMES.jungle]: 0.7,
+    [BIOMES.savanna]: 0.7,
+    [BIOMES.mountain]: 0.7,
 };
 
 export const BIOME_FILENAMES = {
@@ -58,5 +57,5 @@ export const BIOME_FILENAMES = {
     [BIOMES.snowyMountain]: 'snowyMountain.png'
 };
 
-export const CLIMB_DURATION = 1800; // ms to climb up
+export const CLIMB_DURATION = 800; // ms to climb up
 export const CLIMBABLE_BIOMES = [BIOMES.mountain, BIOMES.snowyMountain, BIOMES.badlands, BIOMES.tundra];

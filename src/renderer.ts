@@ -44,13 +44,17 @@ export function renderCharacter(
     ctx: CanvasRenderingContext2D,
     characterImage: HTMLImageElement,
     x: number,
-    y: number
+    y: number,
+    scale: number = 1.0
 ) {
-    const destX = x * TILE_SIZE;
-    const destY = y * TILE_SIZE;
+    const size = TILE_SIZE * scale;
+    const offset = (size - TILE_SIZE) / 2;
+
+    const destX = x * TILE_SIZE - offset;
+    const destY = y * TILE_SIZE - offset;
 
     ctx.drawImage(
         characterImage,
-        destX, destY, TILE_SIZE, TILE_SIZE
+        destX, destY, size, size
     );
 }

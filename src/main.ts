@@ -182,8 +182,8 @@ function moveSteve(dx: number, dy: number) {
   const isTargetClimbable = CLIMBABLE_BIOMES.includes(targetBiomeIndex);
   const isCurrentClimbable = CLIMBABLE_BIOMES.includes(biomeIndex);
 
-  if (isTargetClimbable && !isCurrentClimbable) {
-    // Climbing penalty! (Transitioning from Low to High)
+  const isClimb = isTargetClimbable && !isCurrentClimbable;
+  if (isClimb) {
     console.log(`CLIMB UP: Current Biome (${biomeIndex}) -> Target Biome (${targetBiomeIndex})`);
     duration = CLIMB_DURATION;
   } else {
@@ -193,8 +193,19 @@ function moveSteve(dx: number, dy: number) {
     duration = baseDelay / speed;
   }
 
-  steve.move(dx, dy, duration);
+  steve.move(dx, dy, duration, isClimb);
   generate(); // Regenerate map around new position
+
+  if (isClimb) {
+    requestAnimationFrame(animationLoop);
+  }
+}
+
+function animationLoop() {
+  draw();
+  if (!steve.isReadyToMove()) {
+    requestAnimationFrame(animationLoop);
+  }
 }
 
 document.getElementById('moveUp')?.addEventListener('click', () => moveSteve(0, -1));
