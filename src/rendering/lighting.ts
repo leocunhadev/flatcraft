@@ -1,4 +1,4 @@
-import { TILE_SIZE } from '../config/config';
+import { TILE_SIZE } from '../config';
 
 export interface LightingStep {
     hour: number;

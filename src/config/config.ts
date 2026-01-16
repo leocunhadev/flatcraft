@@ -1,6 +1,5 @@
 export const TILE_SIZE = 48; // Native texture size
 
-
 // Biome Indices (Order defined by left-to-right image position)
 export const BIOMES = {
     deepOcean: 0,
@@ -23,22 +22,22 @@ export const BIOMES = {
 };
 
 export const BIOME_MOVEMENT_SPEEDS = {
-    [BIOMES.deepOcean]: 0.2,
-    [BIOMES.ocean]: 0.4,
+    [BIOMES.deepOcean]: 0.15,
+    [BIOMES.ocean]: 0.3,
 
-    [BIOMES.tundra]: 0.5,
-    [BIOMES.snow]: 0.5,
-    [BIOMES.snowyMountain]: 0.5,
+    [BIOMES.tundra]: 0.45,
+    [BIOMES.snow]: 0.45,
+    [BIOMES.snowyMountain]: 0.45,
 
     [BIOMES.beach]: 0.5,
     [BIOMES.desert]: 0.5,
     [BIOMES.badlands]: 0.5,
 
-    [BIOMES.grass]: 0.6,
-    [BIOMES.forest]: 0.6,
-    [BIOMES.jungle]: 0.6,
-    [BIOMES.savanna]: 0.6,
-    [BIOMES.mountain]: 0.6,
+    [BIOMES.grass]: 1.0,
+    [BIOMES.forest]: 1.0,
+    [BIOMES.jungle]: 1.0,
+    [BIOMES.savanna]: 1.0,
+    [BIOMES.mountain]: 0.8,
 };
 
 export const BIOME_FILENAMES = {

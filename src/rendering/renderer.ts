@@ -1,6 +1,6 @@
 import type { TerrainData } from '../core/generation';
 import { getBiomeIndex } from '../core/biomes';
-import { TILE_SIZE } from '../config/config';
+import { TILE_SIZE } from '../config';
 
 export function renderMap(
     ctx: CanvasRenderingContext2D,

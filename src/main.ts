@@ -1,5 +1,5 @@
 import './style/style.css'
-import { TILE_SIZE, BIOME_MOVEMENT_SPEEDS, CLIMB_DURATION, CLIMBABLE_BIOMES } from './config/config';
+import { TILE_SIZE, BIOME_MOVEMENT_SPEEDS, CLIMB_DURATION, CLIMBABLE_BIOMES } from './config';
 import { WorldManager, type TerrainData } from './core/generation';
 import { renderMap } from './rendering/renderer';
 import { getAtmosphericLight, renderShadows } from './rendering/lighting';
