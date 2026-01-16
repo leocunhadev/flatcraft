@@ -1,5 +1,5 @@
 import './style/style.css'
-import { TILE_SIZE, BIOME_MOVEMENT_SPEEDS, CLIMB_DURATION, CLIMBABLE_BIOMES } from './config';
+import { TILE_SIZE, BIOME_MOVEMENT_SPEEDS, CLIMB_DURATION, CLIMBABLE_BIOMES, WATER_BIOMES } from './config';
 import { WorldManager, type TerrainData } from './core/generation';
 import { renderMap } from './rendering/renderer';
 import { getAtmosphericLight, renderShadows } from './rendering/lighting';
@@ -71,6 +71,16 @@ function generate() {
   centerScreenY = steve.worldY - mapOriginY;
 
   currentTerrainData = worldManager.generate(tilesX, tilesY, mapOriginX, mapOriginY, true);
+
+  // Update Steve's Water State
+  const cx = tilesX >> 1;
+  const cy = tilesY >> 1;
+  const centerIdx = cy * tilesX + cx;
+  const h = currentTerrainData.heightMap[centerIdx];
+  const t = currentTerrainData.tempMap[centerIdx];
+  const m = currentTerrainData.moistureMap[centerIdx];
+  const currentBiome = getBiomeIndex(h, t, m);
+  steve.isInWater = WATER_BIOMES.includes(currentBiome);
 
   // 3. Render Terrain to Cache
   renderMap(terrainCtx, assets.biomeTextures, currentTerrainData);
@@ -164,6 +174,12 @@ function processInput() {
 
 function gameLoop() {
   gameTime = (gameTime + DAY_SPEED) % 24;
+
+  // Update Steve sinking state
+  const { dx, dy } = input.getDirection();
+  steve.isIdleInWater = (dx === 0 && dy === 0);
+  steve.update();
+
   processInput();
   draw();
   requestAnimationFrame(gameLoop);

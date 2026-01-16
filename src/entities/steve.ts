@@ -15,7 +15,10 @@ export class Steve {
     private startMoveTime: number = 0;
     private moveDuration: number = 0;
     private isClimbing: boolean = false;
-    private isDescending: boolean = false;
+    public isDescending: boolean = false;
+    public isInWater: boolean = false;
+    public isIdleInWater: boolean = false;
+    private sinkingScale: number = 1.0;
 
     constructor(initialX: number, initialY: number, onLoad: () => void) {
         this.worldX = initialX;
@@ -67,6 +70,17 @@ export class Steve {
         this.isDescending = isDescend;
     }
 
+    public update() {
+        // Handle sinking logic
+        if (this.isInWater && this.isIdleInWater) {
+            // Decrease scale slowly to simulate sinking (min 60%)
+            this.sinkingScale = Math.max(0.6, this.sinkingScale - 0.005);
+        } else {
+            // Speedily return to normal scale when moving or out of water
+            this.sinkingScale = Math.min(1.0, this.sinkingScale + 0.02);
+        }
+    }
+
     public render(ctx: CanvasRenderingContext2D, screenX: number, screenY: number) {
         if (!this.loaded || !this.armLoaded) return;
 
@@ -85,7 +99,10 @@ export class Steve {
             }
         }
 
-        renderCharacter(ctx, this.image, screenX, screenY, scale);
-        renderArm(ctx, this.armImage, screenX, screenY, this.mouseAngle, scale);
+        scale *= this.sinkingScale;
+
+        const tint = this.isInWater ? 'rgba(0, 100, 255, 0.35)' : undefined;
+        renderCharacter(ctx, this.image, screenX, screenY, scale, tint);
+        renderArm(ctx, this.armImage, screenX, screenY, this.mouseAngle, scale, tint);
     }
 }

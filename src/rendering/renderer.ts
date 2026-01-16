@@ -40,12 +40,17 @@ export function renderMap(
     }
 }
 
+// Persistent buffer for tinting to avoid per-frame allocations
+const tintBuffer = document.createElement('canvas');
+const tintCtx = tintBuffer.getContext('2d')!;
+
 export function renderCharacter(
     ctx: CanvasRenderingContext2D,
     characterImage: HTMLImageElement,
     x: number,
     y: number,
-    scale: number = 1.0
+    scale: number = 1.0,
+    tint?: string
 ) {
     const size = TILE_SIZE * scale;
     const offset = (size - TILE_SIZE) / 2;
@@ -53,10 +58,22 @@ export function renderCharacter(
     const destX = x * TILE_SIZE - offset;
     const destY = y * TILE_SIZE - offset;
 
-    ctx.drawImage(
-        characterImage,
-        destX, destY, size, size
-    );
+    if (tint) {
+        if (tintBuffer.width !== size || tintBuffer.height !== size) {
+            tintBuffer.width = size;
+            tintBuffer.height = size;
+        }
+        tintCtx.clearRect(0, 0, size, size);
+        tintCtx.drawImage(characterImage, 0, 0, size, size);
+        tintCtx.globalCompositeOperation = 'source-atop';
+        tintCtx.fillStyle = tint;
+        tintCtx.fillRect(0, 0, size, size);
+        tintCtx.globalCompositeOperation = 'source-over';
+
+        ctx.drawImage(tintBuffer, destX, destY);
+    } else {
+        ctx.drawImage(characterImage, destX, destY, size, size);
+    }
 }
 
 export function renderArm(
@@ -65,25 +82,37 @@ export function renderArm(
     x: number,
     y: number,
     angle: number,
-    scale: number = 1.0
+    scale: number = 1.0,
+    tint?: string
 ) {
     const size = TILE_SIZE * scale;
-    // Center point of the Steve tile
     const centerX = x * TILE_SIZE + TILE_SIZE / 2;
     const centerY = y * TILE_SIZE + TILE_SIZE / 2;
 
     ctx.save();
     ctx.translate(centerX, centerY);
-    ctx.rotate(angle + Math.PI / 2); // Add 90° rotation to orient the arm correctly
+    ctx.rotate(angle + Math.PI / 2);
 
-    // Draw the arm extending 48px from Steve's center with offset
-    const armOffset = 30; // Distance from Steve's center
+    const armOffset = 30;
     const armLength = 48;
     const armThickness = size * 0.3;
 
-    ctx.drawImage(
-        armImage,
-        armOffset, -armThickness / 2, armLength, armThickness
-    );
+    if (tint) {
+        if (tintBuffer.width < armLength || tintBuffer.height < armThickness) {
+            tintBuffer.width = Math.max(tintBuffer.width, armLength);
+            tintBuffer.height = Math.max(tintBuffer.height, armThickness);
+        }
+        tintCtx.clearRect(0, 0, armLength, armThickness);
+        tintCtx.drawImage(armImage, 0, 0, armLength, armThickness);
+        tintCtx.globalCompositeOperation = 'source-atop';
+        tintCtx.fillStyle = tint;
+        tintCtx.fillRect(0, 0, armLength, armThickness);
+        tintCtx.globalCompositeOperation = 'source-over';
+
+        ctx.drawImage(tintBuffer, 0, 0, armLength, armThickness, armOffset, -armThickness / 2, armLength, armThickness);
+    } else {
+        ctx.drawImage(armImage, armOffset, -armThickness / 2, armLength, armThickness);
+    }
+
     ctx.restore();
 }

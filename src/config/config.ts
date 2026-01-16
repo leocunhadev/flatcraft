@@ -58,3 +58,4 @@ export const BIOME_FILENAMES = {
 
 export const CLIMB_DURATION = 800; // ms to climb up
 export const CLIMBABLE_BIOMES = [BIOMES.mountain, BIOMES.snowyMountain, BIOMES.badlands, BIOMES.tundra];
+export const WATER_BIOMES = [BIOMES.ocean, BIOMES.deepOcean];
