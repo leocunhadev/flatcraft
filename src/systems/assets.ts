@@ -12,8 +12,7 @@ export class AssetLoader {
     }
 
     private loadBiomes() {
-        // @ts-ignore
-        const images = import.meta.glob('../imagens/*.{png,jpg,jpeg}', { eager: true, as: 'url' });
+        const images = import.meta.glob('../imagens/*.{png,jpg,jpeg}', { eager: true, query: '?url', import: 'default' }) as Record<string, string>;
 
         const entries = Object.entries(BIOME_FILENAMES);
         this.totalPending = entries.length;

@@ -1,3 +1,6 @@
+import foodIcon from '../imagens/food_pixel.png';
+import bubbleIcon from '../imagens/bubble_pixel.png';
+
 export class HUDManager {
     private heartIcons: HTMLElement[] = [];
     private bubbleIcons: HTMLElement[] = [];
@@ -19,12 +22,12 @@ export class HUDManager {
                 this.heartIcons.push(heart);
 
                 const food = document.createElement('img');
-                food.src = '/food_pixel.png';
+                food.src = foodIcon;
                 food.className = 'hud-icon';
                 foodRow.appendChild(food);
 
                 const bubble = document.createElement('img');
-                bubble.src = '/bubble_pixel.png';
+                bubble.src = bubbleIcon;
                 bubble.className = 'hud-icon';
                 bubblesRow.appendChild(bubble);
                 this.bubbleIcons.push(bubble);

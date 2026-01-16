@@ -13,6 +13,9 @@ export const CURRENT_VERSION = 1;
 
 export class SaveSystem {
     private static readonly SAVE_KEY = 'flatcraft_save_data';
+    // Changed SAVE_KEY to a prefix for multiple saves
+    private static readonly SAVE_KEY_PREFIX = 'flatcraft_save_';
+    private static readonly DEFAULT_SAVE_ID = 'default'; // For backward compatibility or single save
 
     public static save(data: Omit<GameSaveData, 'version' | 'id'> & { id?: string }) {
         // Verifica se está no navegador
@@ -20,12 +23,18 @@ export class SaveSystem {
 
         try {
             // Tenta manter o ID atual se existir, ou usa o fornecido, ou gera um novo
-            const current = SaveSystem.load();
-            const id = data.id || current?.id || Math.random().toString(36).substring(2, 9).toUpperCase();
+            // If no ID is provided, we'll use a default ID or generate a new one if it's a new save.
+            let id = data.id;
+            if (!id) {
+                // If no ID is provided, try to load the default save to get its ID, or generate a new one.
+                const defaultSave = SaveSystem.loadById(SaveSystem.DEFAULT_SAVE_ID);
+                id = defaultSave?.id || Math.random().toString(36).substring(2, 9).toUpperCase();
+            }
 
             const payload: GameSaveData = { ...data, version: CURRENT_VERSION, id };
             const json = JSON.stringify(payload);
-            localStorage.setItem(this.SAVE_KEY, json);
+            const key = `${this.SAVE_KEY_PREFIX}${id}`;
+            localStorage.setItem(key, json);
             console.log('Game saved successfully.');
         } catch (error) {
             console.error('Failed to save game (Quota exceeded?):', error);
@@ -57,6 +66,31 @@ export class SaveSystem {
             return rawData;
         } catch (error) {
             console.error('Failed to load game:', error);
+            return null;
+        }
+    }
+
+    public static loadById(id: string): GameSaveData | null {
+        if (typeof window === 'undefined') return null;
+
+        try {
+            const key = `${this.SAVE_KEY_PREFIX}${id}`;
+            const json = localStorage.getItem(key);
+            if (!json) return null;
+
+            const rawData = JSON.parse(json);
+
+            if (!SaveSystem.isValidSaveData(rawData)) {
+                console.warn(`Save data for ID '${id}' corrupted or invalid format.`);
+                return null;
+            }
+
+            // No version migration needed here, as load() handles it for the primary load.
+            // For specific ID loads, we assume the data is already migrated or will be handled
+            // by the main load logic if it becomes the active save.
+            return rawData;
+        } catch (error) {
+            console.error(`Failed to load game for ID '${id}':`, error);
             return null;
         }
     }
