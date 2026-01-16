@@ -1,11 +1,10 @@
 import './style.css'
 import { PerlinNoise } from './perlin'
-// @ts-ignore
-import textureUrl from './imagens/texturas_terrenos.png';
-import { TILE_SIZE, SPRITES_PER_ROW } from './config';
+import { TILE_SIZE, BIOME_MOVEMENT_SPEEDS, CLIMB_DURATION, CLIMBABLE_BIOMES, BIOME_FILENAMES } from './config';
 import { generateTerrainData, type TerrainData } from './generation';
 import { renderMap } from './renderer';
 import { Steve } from './steve';
+import { getBiomeIndex } from './biomes';
 
 const canvas = document.getElementById('mapCanvas') as HTMLCanvasElement;
 const ctx = canvas.getContext('2d')!;
@@ -17,10 +16,50 @@ const seedInput = document.getElementById('seedInput') as HTMLInputElement;
 // Initialize Noise Layers
 let noiseHeight = new PerlinNoise();
 let noiseTemp = new PerlinNoise();
+let noiseMoisture = new PerlinNoise();
 
 // Texture Management
-const terrainImage = new Image();
+
+const biomeTextures: Record<number, HTMLImageElement> = {};
 let terrainDataLoaded = false;
+
+// Load images using Vite's glob import
+// @ts-ignore
+const images = import.meta.glob('./imagens/*.{png,jpg,jpeg}', { eager: true, as: 'url' });
+
+let pendingImages = 0;
+
+
+Object.entries(BIOME_FILENAMES).forEach(([idStr, filename]) => {
+  const id = parseInt(idStr);
+  const key = `./imagens/${filename}`;
+  // @ts-ignore
+  const src = images[key];
+
+  if (src) {
+    pendingImages++;
+    const img = new Image();
+    img.onload = () => {
+      pendingImages--;
+      if (pendingImages === 0) {
+        terrainDataLoaded = true;
+        checkLoadAndGenerate();
+      }
+    };
+    img.onerror = () => {
+      console.error(`Failed to load: ${filename}`);
+      pendingImages--;
+      if (pendingImages === 0) {
+        terrainDataLoaded = true;
+        checkLoadAndGenerate();
+      }
+    };
+    img.src = src;
+    biomeTextures[id] = img;
+  } else {
+    console.warn(`Image definition missing for biome ${id}: ${filename}`);
+  }
+});
 
 // Initialize Steve
 const steve = new Steve(1000, 1000, () => {
@@ -31,20 +70,6 @@ let currentTerrainData: TerrainData | null = null;
 // Screen Coordinates (Calculated)
 let centerScreenX = 0;
 let centerScreenY = 0;
-
-terrainImage.onload = () => {
-  // Verification logic
-  const spriteSize = terrainImage.width / SPRITES_PER_ROW;
-  if (Math.floor(spriteSize) !== spriteSize) {
-    console.warn("Sprite size is non-integer, check image dimensions and biome count.");
-  }
-  terrainDataLoaded = true;
-  checkLoadAndGenerate();
-};
-
-
-
-terrainImage.src = textureUrl;
 
 function checkLoadAndGenerate() {
   if (terrainDataLoaded && steve.loaded) {
@@ -102,7 +127,8 @@ function generate() {
     mapOriginY,
     useWarp,
     noiseHeight,
-    noiseTemp
+    noiseTemp,
+    noiseMoisture
   );
 
   draw();
@@ -112,15 +138,62 @@ function draw() {
   if (!currentTerrainData) return;
 
   // Draw Map
-  renderMap(ctx, terrainImage, currentTerrainData);
+  renderMap(ctx, biomeTextures, currentTerrainData);
 
   // Draw Steve at Center Screen
   steve.render(ctx, centerScreenX, centerScreenY);
 }
 
 // Controls
+// Controls
 function moveSteve(dx: number, dy: number) {
-  steve.move(dx, dy);
+  if (!currentTerrainData) return;
+
+  if (!steve.isReadyToMove()) return;
+
+  // Center Index (Steve's current position)
+  const cx = currentTerrainData.tilesX >> 1;
+  const cy = currentTerrainData.tilesY >> 1;
+  const centerIndex = cy * currentTerrainData.tilesX + cx;
+
+  // Target Index (Where Steve is going)
+  // Since we have a buffer, +/- 1 tile is safe
+  const tx = cx + dx;
+  const ty = cy + dy;
+  const targetIndex = ty * currentTerrainData.tilesX + tx;
+
+  // Current Biome
+  const h = currentTerrainData.heightMap[centerIndex];
+  const t = currentTerrainData.tempMap[centerIndex];
+  const m = currentTerrainData.moistureMap[centerIndex];
+  const biomeIndex = getBiomeIndex(h, t, m);
+
+  // Target Biome
+  const h2 = currentTerrainData.heightMap[targetIndex];
+  const t2 = currentTerrainData.tempMap[targetIndex];
+  const m2 = currentTerrainData.moistureMap[targetIndex];
+  const targetBiomeIndex = getBiomeIndex(h2, t2, m2);
+
+  // LOGIC: Movement Speed & Climbing
+  const baseDelay = 150; // default base
+  let duration = baseDelay;
+
+  // Check Climbing: Moving from non-climbable TO climbable
+  const isTargetClimbable = CLIMBABLE_BIOMES.includes(targetBiomeIndex);
+  const isCurrentClimbable = CLIMBABLE_BIOMES.includes(biomeIndex);
+
+  if (isTargetClimbable && !isCurrentClimbable) {
+    // Climbing penalty! (Transitioning from Low to High)
+    console.log(`CLIMB UP: Current Biome (${biomeIndex}) -> Target Biome (${targetBiomeIndex})`);
+    duration = CLIMB_DURATION;
+  } else {
+    // Normal Movement
+    console.log(`WALKING: Current Biome (${biomeIndex}) -> Target Biome (${targetBiomeIndex})`);
+    const speed = BIOME_MOVEMENT_SPEEDS[biomeIndex] || 1.0;
+    duration = baseDelay / speed;
+  }
+
+  steve.move(dx, dy, duration);
   generate(); // Regenerate map around new position
 }
 
@@ -165,7 +238,8 @@ regenerateBtn.addEventListener('click', () => {
   }
 
   noiseHeight = new PerlinNoise(seedVal);
-  noiseTemp = new PerlinNoise(seedVal ? seedVal + 12345 : undefined); // Offset temp noise so it differs from height
+  noiseTemp = new PerlinNoise(seedVal ? seedVal + 12345 : undefined);
+  noiseMoisture = new PerlinNoise(seedVal ? seedVal + 54321 : undefined);
   generate();
 
   canvas.style.transform = 'scale(0.95)';

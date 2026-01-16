@@ -1,5 +1,5 @@
 export const TILE_SIZE = 48; // Native texture size
-export const SPRITES_PER_ROW = 5; // Based on the provided 5x3 grid image
+
 
 // Biome Indices (Order defined by left-to-right image position)
 export const BIOMES = {
@@ -21,3 +21,42 @@ export const BIOMES = {
     mountain: 11,
     snowyMountain: 12
 };
+
+export const BIOME_MOVEMENT_SPEEDS = {
+    [BIOMES.grass]: 0.8,
+    [BIOMES.forest]: 0.8,
+    [BIOMES.jungle]: 0.8,
+    [BIOMES.savanna]: 0.8,
+    [BIOMES.mountain]: 0.8,
+
+    [BIOMES.deepOcean]: 0.3,
+    [BIOMES.ocean]: 0.3,
+
+    [BIOMES.beach]: 0.7,
+
+    [BIOMES.desert]: 0.7,
+    [BIOMES.badlands]: 0.7,
+
+    [BIOMES.tundra]: 0.5,
+    [BIOMES.snow]: 0.5,
+    [BIOMES.snowyMountain]: 0.5
+};
+
+export const BIOME_FILENAMES = {
+    [BIOMES.deepOcean]: 'deepOcean.png',
+    [BIOMES.ocean]: 'ocean.png',
+    [BIOMES.beach]: 'sand.png',
+    [BIOMES.snow]: 'snow.png',
+    [BIOMES.tundra]: 'tundra.png',
+    [BIOMES.grass]: 'grass.png',
+    [BIOMES.forest]: 'forest.png',
+    [BIOMES.jungle]: 'jungle.png',
+    [BIOMES.savanna]: 'savanna.png',
+    [BIOMES.desert]: 'desert.png',
+    [BIOMES.badlands]: 'badlands.png',
+    [BIOMES.mountain]: 'mountain.png',
+    [BIOMES.snowyMountain]: 'snowyMountain.png'
+};
+
+export const CLIMB_DURATION = 1800; // ms to climb up
+export const CLIMBABLE_BIOMES = [BIOMES.mountain, BIOMES.snowyMountain, BIOMES.badlands, BIOMES.tundra];

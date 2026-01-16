@@ -1,42 +1,52 @@
 import { BIOMES } from './config';
 
-export function getBiomeIndex(elevation: number, temperature: number): number {
-    // Elevation is now in range [-10, 10]
-    // Water Line is 6.0 (defines 50% mark)
+export function getBiomeIndex(elevation: number, temperature: number, moisture: number): number {
+    // Elevation range: [-10, 10]
+    // Temperature range: [0, 1]
+    // Moisture range: [0, 1]
 
     // WATER (h <= 6)
     if (elevation <= 6.0) {
-        if (elevation <= 2.5) return BIOMES.deepOcean; // Increased depth visibility
+        if (elevation <= 2.5) return BIOMES.deepOcean;
         return BIOMES.ocean;
     }
 
-    // LAND (h > 6)
-
-    // 1. RULE: Sand only at water borders (Narrow band)
-    if (elevation < 6.2) {
-        return temperature < 0.2 ? BIOMES.tundra : BIOMES.beach;
-    }
-
-    // 2. RULE: Snow appears at great heights
-    // And snow blocks don't appear near desert (Temperature handles this: Low T vs High T)
+    // HIGH ALTITUDE (h > 8.5)
     if (elevation > 8.5) {
-        if (temperature < 0.5) return BIOMES.snowyMountain;
+        if (temperature < 0.4) return BIOMES.snowyMountain;
         return BIOMES.mountain;
     }
 
-    // Standard Terrain (6.2 to 8.5)
-    // COLD
-    if (temperature < 0.25) return BIOMES.snow;
-    // COOL
-    if (temperature < 0.45) return BIOMES.tundra;
-    // TEMPERATE
-    if (temperature < 0.65) {
+    // COASTAL / BEACH (6.0 < h < 6.2)
+    if (elevation < 6.2) {
+        if (temperature < 0.2) return BIOMES.tundra;
+        if (temperature > 0.8 && moisture < 0.3) return BIOMES.desert;
+        return BIOMES.beach;
+    }
+
+    // LAND BIOMES (6.2 <= h <= 8.5)
+    // Cold
+    if (temperature < 0.3) {
+        if (moisture < 0.5) return BIOMES.tundra;
+        return BIOMES.snow;
+    }
+
+    // Warm
+    if (temperature < 0.6) {
+        if (moisture < 0.6) return BIOMES.grass;
+        if (moisture < 0.3) return BIOMES.forest;
+        return BIOMES.jungle;
+    }
+
+    // Hot
+    if (temperature < 0.8) {
+        if (moisture < 0.2) return BIOMES.desert;
+        if (moisture < 0.5) return BIOMES.savanna;
         return BIOMES.forest;
     }
-    // WARM
-    if (temperature < 0.8) return BIOMES.savanna;
 
-    // HOT (Desert clusters)
-    // Rule: Deserts clump together (Managed by Noise Frequency in generation.ts)
-    return BIOMES.desert;
+    // Very Hot
+    if (moisture < 0.2) return BIOMES.badlands;
+    if (moisture < 0.4) return BIOMES.desert;
+    return BIOMES.savanna;
 }

@@ -1,10 +1,10 @@
 import type { TerrainData } from './generation';
 import { getBiomeIndex } from './biomes';
-import { TILE_SIZE, SPRITES_PER_ROW } from './config';
+import { TILE_SIZE } from './config';
 
 export function renderMap(
     ctx: CanvasRenderingContext2D,
-    terrainImage: HTMLImageElement,
+    biomeTextures: Record<number, HTMLImageElement>,
     data: TerrainData
 ) {
     const { heightMap, tempMap, tilesX, tilesY } = data;
@@ -21,22 +21,21 @@ export function renderMap(
             const index = y * tilesX + x;
             const h = heightMap[index];
             const t = tempMap[index];
+            const m = data.moistureMap[index];
 
-            const biomeIndex = getBiomeIndex(h, t);
+            const biomeIndex = getBiomeIndex(h, t, m);
+            const img = biomeTextures[biomeIndex];
 
-            const col = biomeIndex % SPRITES_PER_ROW;
-            const row = Math.floor(biomeIndex / SPRITES_PER_ROW);
+            if (img) {
+                const destX = x * TILE_SIZE;
+                const destY = y * TILE_SIZE;
 
-            const srcX = col * TILE_SIZE;
-            const srcY = row * TILE_SIZE;
-            const destX = x * TILE_SIZE;
-            const destY = y * TILE_SIZE;
-
-            ctx.drawImage(
-                terrainImage,
-                srcX, srcY, TILE_SIZE, TILE_SIZE,
-                destX, destY, TILE_SIZE, TILE_SIZE
-            );
+                ctx.drawImage(
+                    img,
+                    0, 0, img.width, img.height,
+                    destX, destY, TILE_SIZE, TILE_SIZE
+                );
+            }
         }
     }
 }

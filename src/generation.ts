@@ -6,6 +6,7 @@ const WATER_LEVEL = 6.0;
 export interface TerrainData {
     heightMap: Float32Array;
     tempMap: Float32Array;
+    moistureMap: Float32Array;
     tilesX: number;
     tilesY: number;
 }
@@ -17,16 +18,19 @@ export function generateTerrainData(
     offsetY: number,
     useWarp: boolean,
     noiseHeight: PerlinNoise,
-    noiseTemp: PerlinNoise
+    noiseTemp: PerlinNoise,
+    noiseMoisture: PerlinNoise
 ): TerrainData {
 
-    const frequency = 0.1;
-    const octaves = 4;
-    // Increased Temp frequency for more diverse biomes
-    const tempFrequency = frequency * 0.5;
+    // Lower frequencies for larger geological features
+    const frequency = 0.02;
+    const octaves = 6; // More octaves for finer detail on large shapes
+    const tempFrequency = frequency * 0.4;
+    const moistureFrequency = frequency * 0.6;
 
     const heightMap = new Float32Array(tilesX * tilesY);
     const tempMap = new Float32Array(tilesX * tilesY);
+    const moistureMap = new Float32Array(tilesX * tilesY);
 
     // PASS 1: GENERATION (Noise Calculation)
     for (let y = 0; y < tilesY; y++) {
@@ -34,49 +38,62 @@ export function generateTerrainData(
             const worldTileX = x + offsetX;
             const worldTileY = y + offsetY;
 
-            const unwarpedNx = worldTileX * frequency;
-            const unwarpedNy = worldTileY * frequency;
+            // --- HEIGHT ---
+            const nx = worldTileX * frequency;
+            const ny = worldTileY * frequency;
 
-            let nx = unwarpedNx;
-            let ny = unwarpedNy;
+            let hnx = nx;
+            let hny = ny;
 
-            // Domain Warp
             if (useWarp) {
                 const qx = fbm(nx + 5.2, ny + 1.3, 2, 0.5, 2.0, noiseHeight);
                 const qy = fbm(nx + 1.3, ny + 2.8, 2, 0.5, 2.0, noiseHeight);
-                nx += 4.0 * qx * 0.5;
-                ny += 4.0 * qy * 0.5;
+                hnx += 4.0 * qx * 0.2;
+                hny += 4.0 * qy * 0.2;
             }
 
-            let rawE = fbm(nx, ny, octaves, 0.5, 2.0, noiseHeight);
+            let rawE = fbm(hnx, hny, octaves, 0.5, 2.0, noiseHeight);
             const nE = (rawE + 1) / 2;
 
             let h = 0;
-            // Map 40% of values to "Water" range (-10 to 6)
-            // 0..0.4 -> -10..6
-            // 0.4..1 -> 6..10
-            if (nE < 0.40) {
-                h = -10 + (nE / 0.40) * 16;
+            // Smoother mapping for elevation
+            // We want 50% water roughly.
+            if (nE < 0.5) {
+                // Map [0, 0.5] to [-10, 6]
+                h = -10 + (nE / 0.5) * 16;
             } else {
-                h = 6 + ((nE - 0.40) / 0.60) * 4;
+                // Map [0.5, 1.0] to [6, 10]
+                h = 6 + ((nE - 0.5) / 0.5) * 4;
             }
 
-            // Temperature
+            // --- TEMPERATURE ---
             let nTx = (worldTileX * tempFrequency) + 1000;
             let nTy = (worldTileY * tempFrequency) + 1000;
             if (useWarp) {
                 const qx = fbm(nTx, nTy, 2, 0.5, 2.0, noiseHeight);
                 const qy = fbm(nTx + 10, nTy + 10, 2, 0.5, 2.0, noiseHeight);
-                nTx += 2.0 * qx;
-                nTy += 2.0 * qy;
+                nTx += 2.0 * qx * 0.1;
+                nTy += 2.0 * qy * 0.1;
             }
-            // Use 2 octaves for slightly more detail/diversity while keeping clusters
-            let rawT = fbm(nTx, nTy, 2, 0.5, 2.0, noiseTemp);
+            let rawT = fbm(nTx, nTy, 3, 0.5, 2.0, noiseTemp);
             const t = (rawT + 1) / 2;
+
+            // --- MOISTURE ---
+            let nMx = (worldTileX * moistureFrequency) + 2000;
+            let nMy = (worldTileY * moistureFrequency) + 2000;
+            if (useWarp) {
+                const qx = fbm(nMx, nMy, 2, 0.5, 2.0, noiseHeight);
+                const qy = fbm(nMx + 20, nMy + 20, 2, 0.5, 2.0, noiseHeight);
+                nMx += 2.0 * qx * 0.1;
+                nMy += 2.0 * qy * 0.1;
+            }
+            let rawM = fbm(nMx, nMy, 3, 0.5, 2.0, noiseMoisture);
+            const m = (rawM + 1) / 2;
 
             const index = y * tilesX + x;
             heightMap[index] = h;
             tempMap[index] = t;
+            moistureMap[index] = m;
         }
     }
 
@@ -95,36 +112,26 @@ export function generateTerrainData(
                     let distLeft = 999, distRight = 999;
                     let distUp = 999, distDown = 999;
 
-                    // Scan Left
+                    // Scan Left/Right
                     for (let d = 1; d <= SEARCH_DIST; d++) {
-                        if (x - d < 0) break;
-                        if (heightMap[y * tilesX + (x - d)] <= WATER_LEVEL) {
-                            distLeft = d;
-                            break;
+                        if (x - d >= 0) {
+                            if (heightMap[y * tilesX + (x - d)] <= WATER_LEVEL) { distLeft = d; break; }
                         }
                     }
-                    // Scan Right
                     for (let d = 1; d <= SEARCH_DIST; d++) {
-                        if (x + d >= tilesX) break;
-                        if (heightMap[y * tilesX + (x + d)] <= WATER_LEVEL) {
-                            distRight = d;
-                            break;
+                        if (x + d < tilesX) {
+                            if (heightMap[y * tilesX + (x + d)] <= WATER_LEVEL) { distRight = d; break; }
                         }
                     }
-                    // Scan Up
+                    // Scan Up/Down
                     for (let d = 1; d <= SEARCH_DIST; d++) {
-                        if (y - d < 0) break;
-                        if (heightMap[(y - d) * tilesX + x] <= WATER_LEVEL) {
-                            distUp = d;
-                            break;
+                        if (y - d >= 0) {
+                            if (heightMap[(y - d) * tilesX + x] <= WATER_LEVEL) { distUp = d; break; }
                         }
                     }
-                    // Scan Down
                     for (let d = 1; d <= SEARCH_DIST; d++) {
-                        if (y + d >= tilesY) break;
-                        if (heightMap[(y + d) * tilesX + x] <= WATER_LEVEL) {
-                            distDown = d;
-                            break;
+                        if (y + d < tilesY) {
+                            if (heightMap[(y + d) * tilesX + x] <= WATER_LEVEL) { distDown = d; break; }
                         }
                     }
 
@@ -137,5 +144,5 @@ export function generateTerrainData(
         heightMap.set(newHeightMap);
     }
 
-    return { heightMap, tempMap, tilesX, tilesY };
+    return { heightMap, tempMap, moistureMap, tilesX, tilesY };
 }

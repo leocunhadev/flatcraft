@@ -5,7 +5,10 @@ export class Steve {
     public worldX: number;
     public worldY: number;
     public image: HTMLImageElement;
+
+
     public loaded: boolean;
+    private nextMoveTime: number = 0;
 
     constructor(initialX: number, initialY: number, onLoad: () => void) {
         this.worldX = initialX;
@@ -20,9 +23,14 @@ export class Steve {
         this.image.src = steveUrl;
     }
 
-    public move(dx: number, dy: number) {
+    public isReadyToMove(): boolean {
+        return Date.now() >= this.nextMoveTime;
+    }
+
+    public move(dx: number, dy: number, duration: number) {
         this.worldX += dx;
         this.worldY += dy;
+        this.nextMoveTime = Date.now() + duration;
     }
 
     public render(ctx: CanvasRenderingContext2D, screenX: number, screenY: number) {
