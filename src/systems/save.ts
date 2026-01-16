@@ -18,21 +18,23 @@ export class SaveSystem {
     private static readonly SAVE_KEY_PREFIX = 'flatcraft_save_';
     private static readonly DEFAULT_SAVE_ID = 'default'; // For backward compatibility or single save
 
-    public static save(data: Omit<GameSaveData, 'version' | 'id'> & { id?: string }) {
+    public static save(data: Omit<GameSaveData, 'version' | 'id' | 'food'> & { id?: string; foodLevel: number }) {
         // Verifica se está no navegador
         if (typeof window === 'undefined') return;
 
         try {
-            // Tenta manter o ID atual se existir, ou usa o fornecido, ou gera um novo
-            // If no ID is provided, we'll use a default ID or generate a new one if it's a new save.
             let id = data.id;
             if (!id) {
-                // If no ID is provided, try to load the default save to get its ID, or generate a new one.
                 const defaultSave = SaveSystem.loadById(SaveSystem.DEFAULT_SAVE_ID);
                 id = defaultSave?.id || Math.random().toString(36).substring(2, 9).toUpperCase();
             }
 
-            const payload: GameSaveData = { ...data, version: CURRENT_VERSION, id };
+            const payload: GameSaveData = {
+                ...data,
+                food: data.foodLevel, // Map foodLevel to food
+                version: CURRENT_VERSION,
+                id
+            };
             const json = JSON.stringify(payload);
             const key = `${this.SAVE_KEY_PREFIX}${id}`;
             localStorage.setItem(key, json);
