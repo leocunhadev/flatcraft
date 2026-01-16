@@ -103,14 +103,19 @@ export function renderArm(
             tintBuffer.height = Math.max(tintBuffer.height, armThickness);
         }
         tintCtx.clearRect(0, 0, armLength, armThickness);
+        // Desenha a imagem original no buffer
         tintCtx.drawImage(armImage, 0, 0, armLength, armThickness);
+        // Aplica a cor de tint
         tintCtx.globalCompositeOperation = 'source-atop';
         tintCtx.fillStyle = tint;
         tintCtx.fillRect(0, 0, armLength, armThickness);
+        // Restaura a operação de composição
         tintCtx.globalCompositeOperation = 'source-over';
 
+        // Desenha o buffer (agora tingido) no canvas principal
         ctx.drawImage(tintBuffer, 0, 0, armLength, armThickness, armOffset, -armThickness / 2, armLength, armThickness);
     } else {
+        // Desenho sem tintura
         ctx.drawImage(armImage, armOffset, -armThickness / 2, armLength, armThickness);
     }
 
