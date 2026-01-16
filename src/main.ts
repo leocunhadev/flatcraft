@@ -10,6 +10,7 @@ import { InputManager } from './systems/input';
 import { HUDManager } from './systems/hud';
 import { SurvivalSystem } from './systems/survival';
 import { SaveSystem } from './systems/save';
+import { NotificationManager } from './systems/notification';
 
 // Elements
 const canvas = document.getElementById('mapCanvas') as HTMLCanvasElement;
@@ -29,6 +30,7 @@ const assets = new AssetLoader(() => checkLoadAndGenerate());
 const input = new InputManager(canvas);
 const hud = new HUDManager();
 const survival = new SurvivalSystem();
+const notificationManager = new NotificationManager();
 
 // Steve
 const steve = new Steve(1000, 1000, () => checkLoadAndGenerate());
@@ -162,6 +164,8 @@ function draw() {
     ctx.fillStyle = `rgba(${light.r}, ${light.g}, ${light.b}, ${light.a})`;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
   }
+
+  notificationManager.render(ctx);
 }
 
 function moveSteve(dx: number, dy: number) {
@@ -240,6 +244,7 @@ function gameLoop() {
     hud.update(survival.airLevel, survival.healthLevel);
   }
 
+  notificationManager.update();
   processInput();
   draw();
   requestAnimationFrame(gameLoop);
@@ -297,17 +302,13 @@ regenerateBtn.addEventListener('click', () => {
 // Manual save button
 document.getElementById('saveBtn')?.addEventListener('click', () => {
   saveGame();
-  alert('Game Saved (Local)!');
+  showStatus('Game Saved (Local)!');
 });
 
-const statusMsg = document.getElementById('statusMsg');
 function showStatus(text: string, color: string = '#38bdf8') {
-  if (statusMsg) {
-    statusMsg.innerText = text;
-    statusMsg.style.color = color;
-    setTimeout(() => { if (statusMsg.innerText === text) statusMsg.innerText = ''; }, 3000);
-  }
+  notificationManager.add(text, color);
 }
+
 
 // Download save button
 document.getElementById('downloadBtn')?.addEventListener('click', () => {
