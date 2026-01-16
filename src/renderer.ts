@@ -40,3 +40,18 @@ export function renderMap(
         }
     }
 }
+
+export function renderCharacter(
+    ctx: CanvasRenderingContext2D,
+    characterImage: HTMLImageElement,
+    x: number,
+    y: number
+) {
+    const destX = x * TILE_SIZE;
+    const destY = y * TILE_SIZE;
+
+    ctx.drawImage(
+        characterImage,
+        destX, destY, TILE_SIZE, TILE_SIZE
+    );
+}

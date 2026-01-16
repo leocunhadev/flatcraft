@@ -1,10 +1,11 @@
 import './style.css'
 import { PerlinNoise } from './perlin'
 // @ts-ignore
-import textureUrl from './imagens/texturas_terrenos.png'
+import textureUrl from './imagens/texturas_terrenos.png';
+import steveUrl from './imagens/steve.jpeg';
 import { TILE_SIZE, SPRITES_PER_ROW } from './config';
-import { generateTerrainData } from './generation';
-import { renderMap } from './renderer';
+import { generateTerrainData, type TerrainData } from './generation';
+import { renderMap, renderCharacter } from './renderer';
 
 const canvas = document.getElementById('mapCanvas') as HTMLCanvasElement;
 const ctx = canvas.getContext('2d')!;
@@ -19,7 +20,12 @@ let noiseTemp = new PerlinNoise();
 
 // Texture Management
 const terrainImage = new Image();
+const steveImage = new Image();
 let terrainDataLoaded = false;
+let steveLoaded = false;
+let currentTerrainData: TerrainData | null = null;
+let steveX = 2; // Initial Grid Position
+let steveY = 2;
 
 terrainImage.onload = () => {
   // Verification logic
@@ -28,12 +34,25 @@ terrainImage.onload = () => {
     console.warn("Sprite size is non-integer, check image dimensions and biome count.");
   }
   terrainDataLoaded = true;
-  generate();
+  checkLoadAndGenerate();
 };
+
+steveImage.onload = () => {
+  steveLoaded = true;
+  checkLoadAndGenerate();
+}
+
 terrainImage.src = textureUrl;
+steveImage.src = steveUrl;
+
+function checkLoadAndGenerate() {
+  if (terrainDataLoaded && steveLoaded) {
+    generate();
+  }
+}
 
 function generate() {
-  if (!terrainDataLoaded) return;
+  if (!terrainDataLoaded || !steveLoaded) return;
 
   // 1. Gather Inputs
   const visibleTilesInput = parseInt(scaleInput.value);
@@ -68,7 +87,7 @@ function generate() {
   ctx.imageSmoothingEnabled = false;
 
   // 3. Generate Data (Pass 1 & 2)
-  const terrainData = generateTerrainData(
+  currentTerrainData = generateTerrainData(
     tilesX,
     tilesY,
     userOffset,
@@ -77,9 +96,53 @@ function generate() {
     noiseTemp
   );
 
-  // 4. Render (Pass 3)
-  renderMap(ctx, terrainImage, terrainData);
+  // Reset Steve if out of bounds (optional, but good practice)
+  if (steveX >= tilesX) steveX = tilesX - 1;
+  if (steveY >= tilesY) steveY = tilesY - 1;
+
+  draw();
 }
+
+function draw() {
+  if (!currentTerrainData) return;
+
+  // Draw Map
+  renderMap(ctx, terrainImage, currentTerrainData);
+
+  // Draw Steve
+  renderCharacter(ctx, steveImage, steveX, steveY);
+}
+
+// Controls
+function moveSteve(dx: number, dy: number) {
+  if (!currentTerrainData) return;
+
+  const nextX = steveX + dx;
+  const nextY = steveY + dy;
+
+  // Bounds Check
+  if (nextX >= 0 && nextX < currentTerrainData.tilesX &&
+    nextY >= 0 && nextY < currentTerrainData.tilesY) {
+    steveX = nextX;
+    steveY = nextY;
+    draw();
+  }
+}
+
+document.getElementById('moveUp')?.addEventListener('click', () => moveSteve(0, -1));
+document.getElementById('moveDown')?.addEventListener('click', () => moveSteve(0, 1));
+document.getElementById('moveLeft')?.addEventListener('click', () => moveSteve(-1, 0));
+document.getElementById('moveRight')?.addEventListener('click', () => moveSteve(1, 0));
+
+// Keyboard support
+window.addEventListener('keydown', (e) => {
+  switch (e.key) {
+    case 'ArrowUp': moveSteve(0, -1); break;
+    case 'ArrowDown': moveSteve(0, 1); break;
+    case 'ArrowLeft': moveSteve(-1, 0); break;
+    case 'ArrowRight': moveSteve(1, 0); break;
+  }
+});
 
 // Event Listeners
 scaleInput.addEventListener('input', generate);
