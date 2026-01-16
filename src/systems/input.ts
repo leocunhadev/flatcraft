@@ -47,4 +47,8 @@ export class InputManager {
         if (this.pressedKeys.has('ArrowRight') || this.pressedKeys.has('KeyD')) dx += 1;
         return { dx, dy };
     }
+
+    public isEatPressed(): boolean {
+        return this.pressedKeys.has('KeyE');
+    }
 }

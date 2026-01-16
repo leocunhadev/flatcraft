@@ -3,6 +3,7 @@ import bubbleIcon from '../imagens/bubble_pixel.png';
 
 export class HUDManager {
     private heartIcons: HTMLElement[] = [];
+    private foodIcons: HTMLElement[] = [];
     private bubbleIcons: HTMLElement[] = [];
 
     constructor() {
@@ -25,6 +26,7 @@ export class HUDManager {
                 food.src = foodIcon;
                 food.className = 'hud-icon';
                 foodRow.appendChild(food);
+                this.foodIcons.push(food);
 
                 const bubble = document.createElement('img');
                 bubble.src = bubbleIcon;
@@ -35,11 +37,16 @@ export class HUDManager {
         }
     }
 
-    public update(airLevel: number, healthLevel: number) {
+    public update(airLevel: number, healthLevel: number, foodLevel: number) {
         this.heartIcons.forEach((icon, i) => {
             const isVisible = i >= (10 - healthLevel);
             icon.style.opacity = isVisible ? '1' : '0.2';
             icon.style.filter = isVisible ? 'none' : 'grayscale(1)';
+        });
+
+        this.foodIcons.forEach((icon, i) => {
+            const isVisible = i >= (10 - Math.floor(foodLevel));
+            icon.style.opacity = isVisible ? '1' : '0.2';
         });
 
         this.bubbleIcons.forEach((icon, i) => {
