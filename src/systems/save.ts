@@ -7,6 +7,7 @@ export interface GameSaveData {
     worldX: number;
     worldY: number;
     health: number;
+    food: number;
 }
 
 export const CURRENT_VERSION = 1;
@@ -103,7 +104,8 @@ export class SaveSystem {
             typeof data.seed === 'string' &&
             typeof data.worldX === 'number' &&
             typeof data.worldY === 'number' &&
-            typeof data.health === 'number'
+            typeof data.health === 'number' &&
+            typeof data.food === 'number'
         );
     }
 

@@ -10,6 +10,7 @@ import { InputManager } from './systems/input';
 import { HUDManager } from './systems/hud';
 import { SurvivalSystem } from './systems/survival';
 import { SaveSystem } from './systems/save';
+import { FoodManager } from './systems/food';
 
 // Elements
 const canvas = document.getElementById('mapCanvas') as HTMLCanvasElement;
@@ -29,6 +30,7 @@ const assets = new AssetLoader(() => checkLoadAndGenerate());
 const input = new InputManager(canvas);
 const hud = new HUDManager();
 const survival = new SurvivalSystem();
+const foodManager = new FoodManager(assets);
 
 // Steve
 const steve = new Steve(1000, 1000, () => checkLoadAndGenerate());
@@ -37,6 +39,8 @@ const steve = new Steve(1000, 1000, () => checkLoadAndGenerate());
 let currentTerrainData: TerrainData | null = null;
 let centerScreenX = 0;
 let centerScreenY = 0;
+let mapOriginX = 0;
+let mapOriginY = 0;
 let currentSaveId = Math.random().toString(36).substring(2, 9).toUpperCase(); // ID padrão inicial
 
 function checkLoadAndGenerate() {
@@ -53,6 +57,7 @@ function applySaveData(data: any) {
   steve.worldX = data.worldX ?? 1000;
   steve.worldY = data.worldY ?? 1000;
   survival.healthLevel = data.health ?? 10;
+  survival.foodLevel = data.food ?? 10;
   if (data.id) currentSaveId = data.id; // Mantém o ID original do save
 }
 
@@ -70,7 +75,8 @@ function getSaveData(): any {
     seed: worldManager.seed,
     worldX: steve.worldX,
     worldY: steve.worldY,
-    health: survival.healthLevel
+    health: survival.healthLevel,
+    food: survival.foodLevel
   };
 }
 
@@ -121,8 +127,8 @@ function generate() {
   terrainCtx.imageSmoothingEnabled = false;
 
   // 2. World Generation
-  const mapOriginX = steve.worldX - Math.floor(tilesX / 2);
-  const mapOriginY = steve.worldY - Math.floor(tilesY / 2);
+  mapOriginX = steve.worldX - Math.floor(tilesX / 2);
+  mapOriginY = steve.worldY - Math.floor(tilesY / 2);
   centerScreenX = steve.worldX - mapOriginX;
   centerScreenY = steve.worldY - mapOriginY;
 
@@ -154,6 +160,7 @@ function draw() {
   // Composite Frame
   ctx.drawImage(terrainCanvas, 0, 0);
   renderShadows(ctx, currentTerrainData.tilesX, currentTerrainData.tilesY, gameTime);
+  foodManager.render(ctx, mapOriginX, mapOriginY);
   steve.render(ctx, centerScreenX, centerScreenY);
 
   // Atmosphere
@@ -236,8 +243,17 @@ function gameLoop() {
   steve.isIdleInWater = (dx === 0 && dy === 0);
   steve.update();
 
+  if (currentTerrainData) {
+    const despawnDistance = Math.max(currentTerrainData.tilesX, currentTerrainData.tilesY) * 1.5;
+    foodManager.update(currentTerrainData, mapOriginX, mapOriginY, steve.worldX, steve.worldY, despawnDistance);
+  }
+
+  if (input.isEatPressed()) {
+    foodManager.collectFood(steve.worldX, steve.worldY, survival);
+  }
+
   if (survival.update(steve.isInWater, steve.isIdleInWater)) {
-    hud.update(survival.airLevel, survival.healthLevel);
+    hud.update(survival.airLevel, survival.healthLevel, survival.foodLevel);
   }
 
   processInput();
