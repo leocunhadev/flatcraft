@@ -6,28 +6,30 @@ const WATER_LEVEL = 6.0;
 export interface TerrainData {
     heightMap: Float32Array;
     tempMap: Float32Array;
-    visibleTiles: number;
+    tilesX: number;
+    tilesY: number;
 }
 
 export function generateTerrainData(
-    visibleTiles: number,
+    tilesX: number,
+    tilesY: number,
     userOffset: number,
     useWarp: boolean,
     noiseHeight: PerlinNoise,
     noiseTemp: PerlinNoise
 ): TerrainData {
 
-    const frequency = 0.05;
+    const frequency = 0.1;
     const octaves = 4;
-    // Reduced Temp frequency for larger, biomes, but slightly more diverse than before
-    const tempFrequency = frequency * 0.1;
+    // Increased Temp frequency for more diverse biomes
+    const tempFrequency = frequency * 0.5;
 
-    const heightMap = new Float32Array(visibleTiles * visibleTiles);
-    const tempMap = new Float32Array(visibleTiles * visibleTiles);
+    const heightMap = new Float32Array(tilesX * tilesY);
+    const tempMap = new Float32Array(tilesX * tilesY);
 
     // PASS 1: GENERATION (Noise Calculation)
-    for (let y = 0; y < visibleTiles; y++) {
-        for (let x = 0; x < visibleTiles; x++) {
+    for (let y = 0; y < tilesY; y++) {
+        for (let x = 0; x < tilesX; x++) {
             const worldOffsetX = userOffset;
             const worldOffsetY = userOffset;
             const worldTileX = x + worldOffsetX;
@@ -73,7 +75,7 @@ export function generateTerrainData(
             let rawT = fbm(nTx, nTy, 2, 0.5, 2.0, noiseTemp);
             const t = (rawT + 1) / 2;
 
-            const index = y * visibleTiles + x;
+            const index = y * tilesX + x;
             heightMap[index] = h;
             tempMap[index] = t;
         }
@@ -84,9 +86,9 @@ export function generateTerrainData(
         const newHeightMap = new Float32Array(heightMap);
         const SEARCH_DIST = 5;
 
-        for (let y = 0; y < visibleTiles; y++) {
-            for (let x = 0; x < visibleTiles; x++) {
-                const i = y * visibleTiles + x;
+        for (let y = 0; y < tilesY; y++) {
+            for (let x = 0; x < tilesX; x++) {
+                const i = y * tilesX + x;
 
                 // Only modify Land
                 if (heightMap[i] > WATER_LEVEL) {
@@ -97,15 +99,15 @@ export function generateTerrainData(
                     // Scan Left
                     for (let d = 1; d <= SEARCH_DIST; d++) {
                         if (x - d < 0) break;
-                        if (heightMap[y * visibleTiles + (x - d)] <= WATER_LEVEL) {
+                        if (heightMap[y * tilesX + (x - d)] <= WATER_LEVEL) {
                             distLeft = d;
                             break;
                         }
                     }
                     // Scan Right
                     for (let d = 1; d <= SEARCH_DIST; d++) {
-                        if (x + d >= visibleTiles) break;
-                        if (heightMap[y * visibleTiles + (x + d)] <= WATER_LEVEL) {
+                        if (x + d >= tilesX) break;
+                        if (heightMap[y * tilesX + (x + d)] <= WATER_LEVEL) {
                             distRight = d;
                             break;
                         }
@@ -113,15 +115,15 @@ export function generateTerrainData(
                     // Scan Up
                     for (let d = 1; d <= SEARCH_DIST; d++) {
                         if (y - d < 0) break;
-                        if (heightMap[(y - d) * visibleTiles + x] <= WATER_LEVEL) {
+                        if (heightMap[(y - d) * tilesX + x] <= WATER_LEVEL) {
                             distUp = d;
                             break;
                         }
                     }
                     // Scan Down
                     for (let d = 1; d <= SEARCH_DIST; d++) {
-                        if (y + d >= visibleTiles) break;
-                        if (heightMap[(y + d) * visibleTiles + x] <= WATER_LEVEL) {
+                        if (y + d >= tilesY) break;
+                        if (heightMap[(y + d) * tilesX + x] <= WATER_LEVEL) {
                             distDown = d;
                             break;
                         }
@@ -136,5 +138,5 @@ export function generateTerrainData(
         heightMap.set(newHeightMap);
     }
 
-    return { heightMap, tempMap, visibleTiles };
+    return { heightMap, tempMap, tilesX, tilesY };
 }

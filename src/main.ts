@@ -37,13 +37,25 @@ function generate() {
 
   // 1. Gather Inputs
   const visibleTilesInput = parseInt(scaleInput.value);
-  const visibleTiles = Math.max(4, visibleTilesInput);
+  const tilesY = Math.max(4, visibleTilesInput); // Base zoom on vertical height
+
+  // Get container aspect ratio
+  // We use the canvas's current display size (which fills the container)
+  // If canvas is hidden or 0, fallback to square.
+  let aspect = 1;
+  const rect = canvas.getBoundingClientRect();
+  if (rect.width > 0 && rect.height > 0) {
+    aspect = rect.width / rect.height;
+  }
+
+  const tilesX = Math.round(tilesY * aspect);
+
   const userOffset = parseFloat(offsetInput.value);
   const useWarp = warpInput.checked;
 
-  // 2. Resize Canvas
-  const renderWidth = visibleTiles * TILE_SIZE;
-  const renderHeight = visibleTiles * TILE_SIZE;
+  // 2. Resize Canvas Buffer
+  const renderWidth = tilesX * TILE_SIZE;
+  const renderHeight = tilesY * TILE_SIZE;
 
   if (canvas.width !== renderWidth || canvas.height !== renderHeight) {
     canvas.width = renderWidth;
@@ -57,7 +69,8 @@ function generate() {
 
   // 3. Generate Data (Pass 1 & 2)
   const terrainData = generateTerrainData(
-    visibleTiles,
+    tilesX,
+    tilesY,
     userOffset,
     useWarp,
     noiseHeight,
@@ -72,6 +85,13 @@ function generate() {
 scaleInput.addEventListener('input', generate);
 offsetInput.addEventListener('input', generate);
 warpInput.addEventListener('change', generate);
+
+// Debounced resize listener
+let resizeTimeout: number;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimeout);
+  resizeTimeout = setTimeout(generate, 100);
+});
 
 regenerateBtn.addEventListener('click', () => {
   noiseHeight = new PerlinNoise();

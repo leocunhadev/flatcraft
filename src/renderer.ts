@@ -7,7 +7,7 @@ export function renderMap(
     terrainImage: HTMLImageElement,
     data: TerrainData
 ) {
-    const { heightMap, tempMap, visibleTiles } = data;
+    const { heightMap, tempMap, tilesX, tilesY } = data;
 
     // Resize canvas via CSS logic implied by main (main handles logical resize, this renders)
     // Actually main handles logical resize? No, we should probably do it here or assume context is ready.
@@ -16,9 +16,9 @@ export function renderMap(
     // Actually, we should clear here just to be safe, but main logic handles size.
     // Let's assume the canvas buffer is already resized by the caller if needed.
 
-    for (let y = 0; y < visibleTiles; y++) {
-        for (let x = 0; x < visibleTiles; x++) {
-            const index = y * visibleTiles + x;
+    for (let y = 0; y < tilesY; y++) {
+        for (let x = 0; x < tilesX; x++) {
+            const index = y * tilesX + x;
             const h = heightMap[index];
             const t = tempMap[index];
 
