@@ -9,6 +9,7 @@ import { AssetLoader } from './systems/assets';
 import { InputManager } from './systems/input';
 import { HUDManager } from './systems/hud';
 import { SurvivalSystem } from './systems/survival';
+import { SaveSystem } from './systems/save';
 
 // Elements
 const canvas = document.getElementById('mapCanvas') as HTMLCanvasElement;
@@ -36,15 +37,66 @@ const steve = new Steve(1000, 1000, () => checkLoadAndGenerate());
 let currentTerrainData: TerrainData | null = null;
 let centerScreenX = 0;
 let centerScreenY = 0;
+let currentSaveId = Math.random().toString(36).substring(2, 9).toUpperCase(); // ID padrão inicial
 
 function checkLoadAndGenerate() {
   if (assets.isLoaded && steve.loaded) {
+    loadGame();
     generate();
   }
 }
 
+function applySaveData(data: any) {
+  if (!data) return;
+  worldManager.setSeed(data.seed || "");
+  seedInput.value = data.seed || "";
+  steve.worldX = data.worldX ?? 1000;
+  steve.worldY = data.worldY ?? 1000;
+  survival.healthLevel = data.health ?? 10;
+  if (data.id) currentSaveId = data.id; // Mantém o ID original do save
+}
+
+function loadGame() {
+  const savedData = SaveSystem.load();
+  if (savedData) {
+    applySaveData(savedData);
+    console.log("Game state restored from save.");
+  }
+}
+
+function getSaveData(): any {
+  return {
+    id: currentSaveId,
+    seed: worldManager.seed,
+    worldX: steve.worldX,
+    worldY: steve.worldY,
+    health: survival.healthLevel
+  };
+}
+
+function saveGame(silent: boolean = false) {
+  SaveSystem.save(getSaveData());
+  if (silent) {
+    showStatus('Auto-saved', '#64748b'); // Feedback discreto
+  }
+}
+
+// Auto-save a cada 60 segundos
+setInterval(() => saveGame(true), 30000);
+
+function generateRandomSeed(): string {
+  return Math.random().toString(36).substring(2, 10).toUpperCase();
+}
+
 function generate() {
   if (!assets.isLoaded || !steve.loaded) return;
+
+  // Ensure map always has a seed
+  if (!worldManager.seed) {
+    const newSeed = generateRandomSeed();
+    worldManager.setSeed(newSeed);
+    seedInput.value = newSeed;
+  }
 
   // 1. Zoom/Canvas Sizing
   const visibleTilesInput = parseInt(scaleInput.value);
@@ -193,6 +245,26 @@ function gameLoop() {
   requestAnimationFrame(gameLoop);
 }
 
+// Settings Modal Logic
+const settingsModal = document.getElementById('settingsModal');
+const settingsBtn = document.getElementById('settingsBtn');
+const closeSettingsBtn = document.getElementById('closeSettingsBtn');
+
+settingsBtn?.addEventListener('click', () => {
+  settingsModal?.classList.add('active');
+});
+
+closeSettingsBtn?.addEventListener('click', () => {
+  settingsModal?.classList.remove('active');
+});
+
+// Close modal when clicking outside
+settingsModal?.addEventListener('click', (e) => {
+  if (e.target === settingsModal) {
+    settingsModal.classList.remove('active');
+  }
+});
+
 // UI Event Listeners
 const attachClick = (id: string, dx: number, dy: number) => {
   document.getElementById(id)?.addEventListener('click', () => moveSteve(dx, dy));
@@ -211,10 +283,76 @@ scaleInput.addEventListener('input', generate);
 window.addEventListener('resize', () => generate()); // Simple resize for now
 
 regenerateBtn.addEventListener('click', () => {
-  worldManager.setSeed(seedInput.value.trim());
+  let seed = seedInput.value.trim();
+  if (!seed) {
+    seed = generateRandomSeed();
+    seedInput.value = seed;
+  }
+  worldManager.setSeed(seed);
   generate();
   canvas.style.transform = 'scale(0.95)';
   setTimeout(() => canvas.style.transform = 'scale(1)', 100);
+});
+
+// Manual save button
+document.getElementById('saveBtn')?.addEventListener('click', () => {
+  saveGame();
+  alert('Game Saved (Local)!');
+});
+
+const statusMsg = document.getElementById('statusMsg');
+function showStatus(text: string, color: string = '#38bdf8') {
+  if (statusMsg) {
+    statusMsg.innerText = text;
+    statusMsg.style.color = color;
+    setTimeout(() => { if (statusMsg.innerText === text) statusMsg.innerText = ''; }, 3000);
+  }
+}
+
+// Download save button
+document.getElementById('downloadBtn')?.addEventListener('click', () => {
+  showStatus('Preparing file...');
+  try {
+    const data = getSaveData();
+    SaveSystem.downloadSave(data);
+    showStatus('Download initiated!', '#10b981');
+  } catch (err) {
+    showStatus('Error preparing download!', '#ef4444');
+    console.error(err);
+  }
+});
+
+// Upload save button
+document.getElementById('uploadBtn')?.addEventListener('click', () => {
+  document.getElementById('saveFileInput')?.click();
+});
+
+// File input handler
+document.getElementById('saveFileInput')?.addEventListener('change', async (e: any) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  try {
+    const data = await SaveSystem.importSaveFromFile(file);
+    if (data) {
+      applySaveData(data);
+      saveGame(); // Sincroniza com o localStorage
+      location.reload(); // Recarrega para aplicar o novo estado
+    } else {
+      showStatus('Invalid save file!', '#ef4444');
+    }
+  } catch (err: any) {
+    showStatus('Error importing file!', '#ef4444');
+    console.error(err);
+  }
+});
+
+// Manual clear button
+document.getElementById('clearSaveBtn')?.addEventListener('click', () => {
+  if (confirm('Are you sure you want to clear your save?')) {
+    SaveSystem.clear();
+    location.reload();
+  }
 });
 
 // Start

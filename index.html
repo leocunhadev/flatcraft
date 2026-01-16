@@ -22,31 +22,15 @@
       <div class="canvas-container">
         <!-- Logical resolution 32x32, scaled via CSS -->
         <canvas id="mapCanvas" width="32" height="32"></canvas>
+        <button id="settingsBtn" class="settings-btn" title="Settings">
+          <span class="icon">⚙️</span>
+        </button>
         <div class="hud-container" id="hud">
           <div class="hud-row" id="heartsRow"></div>
           <div class="hud-row" id="foodRow"></div>
           <div class="hud-row" id="bubblesRow"></div>
         </div>
         <div class="overlay"></div>
-      </div>
-
-      <div class="controls">
-        <button id="regenerateBtn">
-          <span class="icon">↻</span> Regenerate
-        </button>
-
-        <div class="params">
-          <div class="param-group">
-            <label>Map Seed (Optional)</label>
-            <input type="text" id="seedInput" placeholder="Enter seed..."
-              style="width:100%; margin-bottom: 10px; padding: 5px; border-radius: 4px; border: 1px solid #444; background: #222; color: white;">
-          </div>
-
-          <label>Zoom Level (View Distance)</label>
-          <!-- Controls how many tiles are visible (4x4 to 250x250) -->
-          <input type="range" id="scaleInput" min="4" max="250" step="2" value="40">
-        </div>
-
 
         <div class="dpad-container">
           <div class="dpad-grid">
@@ -63,6 +47,60 @@
             <button class="dpad-btn diag" id="moveDR" title="Down Right">↘</button>
           </div>
         </div>
+      </div>
+
+      <div class="controls-overlay" id="settingsModal">
+        <div class="modal">
+          <div class="modal-header">
+            <h2>Game Settings</h2>
+            <button id="closeSettingsBtn" class="close-btn">&times;</button>
+          </div>
+
+          <div class="controls">
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <button id="regenerateBtn" style="flex: 1; padding: 0.8rem;">
+                <span class="icon">↻</span> Regenerate
+              </button>
+              <button id="saveBtn"
+                style="width: 42px; padding: 0.8rem; background: linear-gradient(135deg, #10b981, #059669);"
+                title="Manual Save">
+                <span class="icon">💾</span>
+              </button>
+              <button id="downloadBtn"
+                style="width: 42px; padding: 0.8rem; background: linear-gradient(135deg, #8b5cf6, #7c3aed);"
+                title="Download Save File">
+                <span class="icon">📥</span>
+              </button>
+              <button id="uploadBtn"
+                style="width: 42px; padding: 0.8rem; background: linear-gradient(135deg, #f59e0b, #d97706);"
+                title="Upload Save File">
+                <span class="icon">📤</span>
+              </button>
+              <input type="file" id="saveFileInput" accept=".json" style="display: none;">
+              <button id="clearSaveBtn"
+                style="width: 42px; padding: 0.8rem; background: linear-gradient(135deg, #ef4444, #dc2626);"
+                title="Clear Save">
+                <span class="icon">🗑️</span>
+              </button>
+            </div>
+
+            <div class="params">
+              <div class="param-group">
+                <label>Map Seed (Optional)</label>
+                <input type="text" id="seedInput" placeholder="Enter seed..."
+                  style="width:100%; margin-bottom: 10px; padding: 5px; border-radius: 4px; border: 1px solid #444; background: #222; color: white;">
+              </div>
+
+              <label>Zoom Level (View Distance)</label>
+              <input type="range" id="scaleInput" min="4" max="250" step="2" value="40">
+            </div>
+          </div>
+        </div>
+      </div>
+
+
+      <div id="statusMsg"
+        style="margin-top: 10px; font-size: 0.85rem; color: #38bdf8; min-height: 1.2em; text-align: center; font-weight: 500;">
       </div>
   </div>
   </main>

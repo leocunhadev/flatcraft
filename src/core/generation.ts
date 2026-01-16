@@ -15,6 +15,7 @@ export class WorldManager {
     public noiseHeight: PerlinNoise;
     public noiseTemp: PerlinNoise;
     public noiseMoisture: PerlinNoise;
+    public seed: string = "";
 
     constructor() {
         this.noiseHeight = new PerlinNoise();
@@ -23,6 +24,7 @@ export class WorldManager {
     }
 
     public setSeed(seed: string) {
+        this.seed = seed;
         let seedVal: number | undefined;
 
         if (seed !== "") {
