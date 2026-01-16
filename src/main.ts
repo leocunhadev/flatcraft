@@ -2,7 +2,7 @@ import './style.css'
 import { PerlinNoise } from './perlin'
 import { TILE_SIZE, BIOME_MOVEMENT_SPEEDS, CLIMB_DURATION, CLIMBABLE_BIOMES, BIOME_FILENAMES } from './config';
 import { generateTerrainData, type TerrainData } from './generation';
-import { renderMap } from './renderer';
+import { renderMap, renderShadows } from './renderer';
 import { Steve } from './steve';
 import { getBiomeIndex } from './biomes';
 
@@ -11,6 +11,76 @@ const ctx = canvas.getContext('2d')!;
 const regenerateBtn = document.getElementById('regenerateBtn') as HTMLButtonElement;
 const scaleInput = document.getElementById('scaleInput') as HTMLInputElement;
 const seedInput = document.getElementById('seedInput') as HTMLInputElement;
+
+// Terrain Cache & Lighting
+const terrainCanvas = document.createElement('canvas');
+const terrainCtx = terrainCanvas.getContext('2d')!;
+let gameTime = 12; // 0-24h cycle
+const DAY_SPEED = 0.001;
+
+interface LightingStep {
+  hour: number;
+  r: number;
+  g: number;
+  b: number;
+  a: number;
+}
+
+const LIGHTING_TIMELINE: LightingStep[] = [
+  { hour: 0, r: 10, g: 15, b: 45, a: 0.9 },  // Midnight
+  { hour: 1, r: 10, g: 15, b: 45, a: 0.9 },
+  { hour: 2, r: 10, g: 15, b: 45, a: 0.9 },
+  { hour: 3, r: 10, g: 15, b: 45, a: 0.9 },
+  { hour: 4, r: 10, g: 15, b: 45, a: 0.9 },
+  { hour: 5, r: 30, g: 20, b: 60, a: 0.7 },  // Dawn
+  { hour: 6, r: 255, g: 140, b: 50, a: 0.35 }, // Sunrise (Golden Hour)
+  { hour: 7, r: 255, g: 140, b: 50, a: 0.15 },
+  { hour: 8, r: 255, g: 255, b: 255, a: 0.0 },  // Morning
+  { hour: 9, r: 255, g: 255, b: 255, a: 0.0 },
+  { hour: 10, r: 255, g: 255, b: 255, a: 0.0 },
+  { hour: 11, r: 255, g: 255, b: 255, a: 0.0 },
+  { hour: 12, r: 255, g: 255, b: 255, a: 0.0 },  // Noon
+  { hour: 13, r: 255, g: 255, b: 255, a: 0.0 },
+  { hour: 14, r: 255, g: 255, b: 255, a: 0.0 },
+  { hour: 15, r: 255, g: 255, b: 255, a: 0.0 },
+  { hour: 16, r: 255, g: 255, b: 255, a: 0.0 },
+  { hour: 17, r: 255, g: 80, b: 20, a: 0.4 },  // Sunset (Golden Hour)
+  { hour: 18, r: 255, g: 80, b: 20, a: 0.4 },
+  { hour: 19, r: 40, g: 20, b: 80, a: 0.6 },  // Dusk
+  { hour: 20, r: 40, g: 20, b: 80, a: 0.6 },
+  { hour: 21, r: 40, g: 20, b: 80, a: 0.6 },
+  { hour: 22, r: 40, g: 20, b: 80, a: 0.6 },
+  { hour: 23, r: 10, g: 15, b: 45, a: 0.8 }   // Midnight cycle
+];
+
+function getAtmosphericLight(time: number) {
+  const t = time % 24;
+
+  // Find the two keyframes we are between
+  let nextIdx = LIGHTING_TIMELINE.findIndex(step => step.hour > t);
+  if (nextIdx === -1) nextIdx = 0;
+
+  let prevIdx = nextIdx - 1;
+  if (prevIdx < 0) prevIdx = LIGHTING_TIMELINE.length - 1;
+
+  const prev = LIGHTING_TIMELINE[prevIdx];
+  let next = LIGHTING_TIMELINE[nextIdx];
+
+  // Calculate interpolation factor
+  let prevHour = prev.hour;
+  let nextHour = next.hour;
+
+  if (nextHour < prevHour) nextHour += 24; // Handle midnight wrap
+
+  let factor = (t < prevHour ? t + 24 - prevHour : t - prevHour) / (nextHour - prevHour);
+
+  return {
+    r: Math.round(prev.r + (next.r - prev.r) * factor),
+    g: Math.round(prev.g + (next.g - prev.g) * factor),
+    b: Math.round(prev.b + (next.b - prev.b) * factor),
+    a: prev.a + (next.a - prev.a) * factor
+  };
+}
 
 
 // Initialize Noise Layers
@@ -104,12 +174,17 @@ function generate() {
   if (canvas.width !== renderWidth || canvas.height !== renderHeight) {
     canvas.width = renderWidth;
     canvas.height = renderHeight;
+    terrainCanvas.width = renderWidth;
+    terrainCanvas.height = renderHeight;
   }
 
-  // Clear canvas
+  // Clear buffers
   ctx.clearRect(0, 0, renderWidth, renderHeight);
+  terrainCtx.clearRect(0, 0, renderWidth, renderHeight);
+
   // Turn off smoothing for crisp pixel art
   ctx.imageSmoothingEnabled = false;
+  terrainCtx.imageSmoothingEnabled = false;
 
   // 3. Generate Data
   // Calculate Map Origin based on Player Position (Centering Logic)
@@ -131,17 +206,31 @@ function generate() {
     noiseMoisture
   );
 
+  // Cache terrain rendering
+  renderMap(terrainCtx, biomeTextures, currentTerrainData);
+
   draw();
 }
 
 function draw() {
   if (!currentTerrainData) return;
 
-  // Draw Map
-  renderMap(ctx, biomeTextures, currentTerrainData);
+  // Draw Cached Map
+  ctx.drawImage(terrainCanvas, 0, 0);
+
+  // Dynamic Shadows based on Sun position
+  renderShadows(ctx, currentTerrainData.tilesX, currentTerrainData.tilesY, gameTime);
 
   // Draw Steve at Center Screen
   steve.render(ctx, centerScreenX, centerScreenY);
+
+  // Atmospheric Lighting System (Timeline)
+  const light = getAtmosphericLight(gameTime);
+
+  if (light.a > 0.01) {
+    ctx.fillStyle = `rgba(${light.r}, ${light.g}, ${light.b}, ${light.a})`;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
 }
 
 // Controls
@@ -252,8 +341,14 @@ function processInput() {
   }
 }
 
-// Continuous check for held keys
-setInterval(processInput, 50);
+// Continuous loop
+function gameLoop() {
+  gameTime = (gameTime + DAY_SPEED) % 24;
+  processInput();
+  draw();
+  requestAnimationFrame(gameLoop);
+}
+requestAnimationFrame(gameLoop);
 
 // Event Listeners
 canvas.addEventListener('mousemove', (e) => {

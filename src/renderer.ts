@@ -87,3 +87,45 @@ export function renderArm(
     );
     ctx.restore();
 }
+
+export function renderShadows(
+    ctx: CanvasRenderingContext2D,
+    tilesX: number,
+    tilesY: number,
+    gameTime: number
+) {
+    const width = tilesX * TILE_SIZE;
+    const height = tilesY * TILE_SIZE;
+
+    // 24h Cycle transformed into 360 degrees
+    // We add an offset so that at 12:00 (midday) it aligns with the user's desired diagonal path
+    const angle = (gameTime / 24) * Math.PI * 2 + (Math.PI / 4);
+
+    // Intensity: Smoothly varies, peak at midday (12h), lowest at midnight (0h)
+    // We use a small minimum (0.05) to prevent the "jump" when shadows are removed
+    const dayFactor = Math.cos(((gameTime - 12) / 12) * Math.PI); // 1.0 at noon, -1.0 at midnight
+    const intensity = 0.05 + ((dayFactor + 1) / 2) * 0.25;
+
+    // Sun Vector
+    const vx = Math.cos(angle);
+    const vy = Math.sin(angle);
+
+    // Center point for the gradient pivot
+    const cx = width / 2;
+    const cy = height / 2;
+
+    // Project gradient across the whole canvas.
+    // By using a large constant distance, the gradient line never collapses to zero length.
+    const dist = Math.max(width, height);
+
+    const grad = ctx.createLinearGradient(
+        cx + vx * dist, cy + vy * dist, // Shadow side
+        cx - vx * dist, cy - vy * dist  // Light side
+    );
+
+    grad.addColorStop(0, `rgba(0, 0, 0, ${intensity})`);
+    grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, width, height);
+}
