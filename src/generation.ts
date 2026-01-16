@@ -13,7 +13,8 @@ export interface TerrainData {
 export function generateTerrainData(
     tilesX: number,
     tilesY: number,
-    userOffset: number,
+    offsetX: number,
+    offsetY: number,
     useWarp: boolean,
     noiseHeight: PerlinNoise,
     noiseTemp: PerlinNoise
@@ -30,10 +31,8 @@ export function generateTerrainData(
     // PASS 1: GENERATION (Noise Calculation)
     for (let y = 0; y < tilesY; y++) {
         for (let x = 0; x < tilesX; x++) {
-            const worldOffsetX = userOffset;
-            const worldOffsetY = userOffset;
-            const worldTileX = x + worldOffsetX;
-            const worldTileY = y + worldOffsetY;
+            const worldTileX = x + offsetX;
+            const worldTileY = y + offsetY;
 
             const unwarpedNx = worldTileX * frequency;
             const unwarpedNy = worldTileY * frequency;

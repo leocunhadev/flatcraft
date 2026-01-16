@@ -2,17 +2,16 @@ import './style.css'
 import { PerlinNoise } from './perlin'
 // @ts-ignore
 import textureUrl from './imagens/texturas_terrenos.png';
-import steveUrl from './imagens/steve.jpeg';
 import { TILE_SIZE, SPRITES_PER_ROW } from './config';
 import { generateTerrainData, type TerrainData } from './generation';
-import { renderMap, renderCharacter } from './renderer';
+import { renderMap } from './renderer';
+import { Steve } from './steve';
 
 const canvas = document.getElementById('mapCanvas') as HTMLCanvasElement;
 const ctx = canvas.getContext('2d')!;
 const regenerateBtn = document.getElementById('regenerateBtn') as HTMLButtonElement;
 const scaleInput = document.getElementById('scaleInput') as HTMLInputElement;
-const offsetInput = document.getElementById('offsetInput') as HTMLInputElement;
-const warpInput = document.getElementById('warpInput') as HTMLInputElement;
+
 
 // Initialize Noise Layers
 let noiseHeight = new PerlinNoise();
@@ -20,12 +19,17 @@ let noiseTemp = new PerlinNoise();
 
 // Texture Management
 const terrainImage = new Image();
-const steveImage = new Image();
 let terrainDataLoaded = false;
-let steveLoaded = false;
+
+// Initialize Steve
+const steve = new Steve(1000, 1000, () => {
+  checkLoadAndGenerate();
+});
+
 let currentTerrainData: TerrainData | null = null;
-let steveX = 2; // Initial Grid Position
-let steveY = 2;
+// Screen Coordinates (Calculated)
+let centerScreenX = 0;
+let centerScreenY = 0;
 
 terrainImage.onload = () => {
   // Verification logic
@@ -37,22 +41,18 @@ terrainImage.onload = () => {
   checkLoadAndGenerate();
 };
 
-steveImage.onload = () => {
-  steveLoaded = true;
-  checkLoadAndGenerate();
-}
+
 
 terrainImage.src = textureUrl;
-steveImage.src = steveUrl;
 
 function checkLoadAndGenerate() {
-  if (terrainDataLoaded && steveLoaded) {
+  if (terrainDataLoaded && steve.loaded) {
     generate();
   }
 }
 
 function generate() {
-  if (!terrainDataLoaded || !steveLoaded) return;
+  if (!terrainDataLoaded || !steve.loaded) return;
 
   // 1. Gather Inputs
   const visibleTilesInput = parseInt(scaleInput.value);
@@ -69,8 +69,7 @@ function generate() {
 
   const tilesX = Math.round(tilesY * aspect);
 
-  const userOffset = parseFloat(offsetInput.value);
-  const useWarp = warpInput.checked;
+  const useWarp = true; // Default to connected oceans
 
   // 2. Resize Canvas Buffer
   const renderWidth = tilesX * TILE_SIZE;
@@ -86,19 +85,24 @@ function generate() {
   // Turn off smoothing for crisp pixel art
   ctx.imageSmoothingEnabled = false;
 
-  // 3. Generate Data (Pass 1 & 2)
+  // 3. Generate Data
+  // Calculate Map Origin based on Player Position (Centering Logic)
+  const mapOriginX = steve.worldX - Math.floor(tilesX / 2);
+  const mapOriginY = steve.worldY - Math.floor(tilesY / 2);
+
+  // Store center for rendering Steve
+  centerScreenX = steve.worldX - mapOriginX;
+  centerScreenY = steve.worldY - mapOriginY;
+
   currentTerrainData = generateTerrainData(
     tilesX,
     tilesY,
-    userOffset,
+    mapOriginX,
+    mapOriginY,
     useWarp,
     noiseHeight,
     noiseTemp
   );
-
-  // Reset Steve if out of bounds (optional, but good practice)
-  if (steveX >= tilesX) steveX = tilesX - 1;
-  if (steveY >= tilesY) steveY = tilesY - 1;
 
   draw();
 }
@@ -109,24 +113,14 @@ function draw() {
   // Draw Map
   renderMap(ctx, terrainImage, currentTerrainData);
 
-  // Draw Steve
-  renderCharacter(ctx, steveImage, steveX, steveY);
+  // Draw Steve at Center Screen
+  steve.render(ctx, centerScreenX, centerScreenY);
 }
 
 // Controls
 function moveSteve(dx: number, dy: number) {
-  if (!currentTerrainData) return;
-
-  const nextX = steveX + dx;
-  const nextY = steveY + dy;
-
-  // Bounds Check
-  if (nextX >= 0 && nextX < currentTerrainData.tilesX &&
-    nextY >= 0 && nextY < currentTerrainData.tilesY) {
-    steveX = nextX;
-    steveY = nextY;
-    draw();
-  }
+  steve.move(dx, dy);
+  generate(); // Regenerate map around new position
 }
 
 document.getElementById('moveUp')?.addEventListener('click', () => moveSteve(0, -1));
@@ -146,8 +140,6 @@ window.addEventListener('keydown', (e) => {
 
 // Event Listeners
 scaleInput.addEventListener('input', generate);
-offsetInput.addEventListener('input', generate);
-warpInput.addEventListener('change', generate);
 
 // Debounced resize listener
 let resizeTimeout: number;
