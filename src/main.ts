@@ -2,6 +2,9 @@ import './style.css'
 import { PerlinNoise } from './perlin'
 // @ts-ignore
 import textureUrl from './imagens/texturas_terrenos.png'
+import { TILE_SIZE, SPRITES_PER_ROW } from './config';
+import { generateTerrainData } from './generation';
+import { renderMap } from './renderer';
 
 const canvas = document.getElementById('mapCanvas') as HTMLCanvasElement;
 const ctx = canvas.getContext('2d')!;
@@ -10,245 +13,60 @@ const scaleInput = document.getElementById('scaleInput') as HTMLInputElement;
 const offsetInput = document.getElementById('offsetInput') as HTMLInputElement;
 const warpInput = document.getElementById('warpInput') as HTMLInputElement;
 
-const WIDTH = 256;
-const HEIGHT = 256;
-
-// Sync canvas internal resolution
-canvas.width = WIDTH;
-canvas.height = HEIGHT;
-
 // Initialize Noise Layers
 let noiseHeight = new PerlinNoise();
 let noiseTemp = new PerlinNoise();
 
 // Texture Management
 const terrainImage = new Image();
-let terrainData: Uint8ClampedArray | null = null;
-let spriteSize = 16;
-const spritesPerRow = 5; // Based on the provided 5x3 grid image
+let terrainDataLoaded = false;
 
 terrainImage.onload = () => {
-  const offCanvas = document.createElement('canvas');
-  offCanvas.width = terrainImage.width;
-  offCanvas.height = terrainImage.height;
-  const offCtx = offCanvas.getContext('2d')!;
-  offCtx.drawImage(terrainImage, 0, 0);
-  // Calculate sprite size based on 5 columns
-  spriteSize = terrainImage.width / spritesPerRow;
+  // Verification logic
+  const spriteSize = terrainImage.width / SPRITES_PER_ROW;
   if (Math.floor(spriteSize) !== spriteSize) {
     console.warn("Sprite size is non-integer, check image dimensions and biome count.");
   }
-  terrainData = offCtx.getImageData(0, 0, terrainImage.width, terrainImage.height).data;
+  terrainDataLoaded = true;
   generate();
 };
 terrainImage.src = textureUrl;
 
-// Ensure we don't try to generate before load, though generate() checks terrainData.
-
-// Biome Indices (Order defined by left-to-right image position)
-const BIOMES = {
-  deepOcean: 0,
-  ocean: 1,
-  beach: 2,
-
-  snow: 3,
-  tundra: 4,
-
-  grass: 5,
-  forest: 6,
-  jungle: 7,
-
-  savanna: 8,
-  desert: 9,
-  badlands: 10,
-
-  mountain: 11,
-  snowyMountain: 12
-};
-
-function getBiomeIndex(elevation: number, temperature: number): number {
-  // Elevation is now in range [-10, 10]
-  // Water Line is 6.0 (defines 50% mark)
-
-  // WATER (h <= 6)
-  if (elevation <= 6.0) {
-    if (elevation < 1.0) return BIOMES.deepOcean; // Increased range for visibility
-    // if (elevation < 4.0) return BIOMES.ocean;      // -5 to 4
-    return BIOMES.ocean;
-  }
-
-  // LAND (h > 6)
-
-  // Beach/Sand: 6.0 to 6.4
-  if (elevation < 6.4) {
-    return temperature < 0.2 ? BIOMES.tundra : BIOMES.beach;
-  }
-
-  // Mountains: > 9.0
-  if (elevation > 9.0) {
-    if (temperature < 0.5) return BIOMES.snowyMountain;
-    return BIOMES.mountain;
-  }
-
-  // Standard Terrain (6.4 to 9.0)
-  // COLD
-  if (temperature < 0.3) return BIOMES.snow;
-  // COOL
-  if (temperature < 0.45) return BIOMES.tundra;
-  // TEMPERATE
-  if (temperature < 0.65) {
-    return BIOMES.forest; // Mostly forest
-  }
-  // WARM
-  if (temperature < 0.8) return BIOMES.savanna;
-  // HOT
-  return BIOMES.desert;
-}
-
-// Fractal Brownian Motion (Octaves)
-function fbm(x: number, y: number, octaves: number, persistence: number, lacunarity: number, noiseSource: PerlinNoise): number {
-  let total = 0;
-  let frequency = 1;
-  let amplitude = 1;
-  let maxValue = 0;
-
-  for (let i = 0; i < octaves; i++) {
-    total += noiseSource.noise(x * frequency, y * frequency, 0) * amplitude;
-    maxValue += amplitude;
-    amplitude *= persistence;
-    frequency *= lacunarity;
-  }
-
-  return total / maxValue;
-}
-
 function generate() {
-  if (!terrainData) return; // Wait for texture
+  if (!terrainDataLoaded) return;
 
-  const scale = parseFloat(scaleInput.value);
+  // 1. Gather Inputs
+  const visibleTilesInput = parseInt(scaleInput.value);
+  const visibleTiles = Math.max(4, visibleTilesInput);
   const userOffset = parseFloat(offsetInput.value);
   const useWarp = warpInput.checked;
 
-  // Elevation settings
-  const baseFreq = 0.03;
-  const frequency = baseFreq * (scale / 2);
-  const octaves = 4;
+  // 2. Resize Canvas
+  const renderWidth = visibleTiles * TILE_SIZE;
+  const renderHeight = visibleTiles * TILE_SIZE;
 
-  // Temperature settings
-  const tempFrequency = frequency * 0.15;
-
-  // Prepare Output Data
-  const canvasData = ctx.createImageData(WIDTH, HEIGHT);
-  const outputData = canvasData.data;
-
-  // Texture dimensions
-  const texWidth = terrainImage.width;
-  // const texHeight = terrainImage.height;
-
-  for (let y = 0; y < HEIGHT; y++) {
-    for (let x = 0; x < WIDTH; x++) {
-      // 1. Get raw noise 0..1
-      // Calculate base 'world' coordinates that scale with frequency (zoom)
-      // To ensure stable zooming (features don't drift), we multiply X by frequency first, THEN add the offset.
-      // This pins the "0,0" coordinate to the offset value, rather than sliding it as frequency changes.
-      const worldOffsetX = userOffset * 0.5; // Fixed world-space step
-      const worldOffsetY = userOffset * 0.5;
-
-      const unwarpedNx = (x * frequency) + worldOffsetX;
-      const unwarpedNy = (y * frequency) + worldOffsetY;
-
-      let nx = unwarpedNx;
-      let ny = unwarpedNy;
-
-      // DOMAIN WARPING
-      if (useWarp) {
-        // We use the noise itself to offset the coordinates
-        // q = fbm(p + ...)
-
-        const qx = fbm(nx + 5.2, ny + 1.3, 2, 0.5, 2.0, noiseHeight);
-        const qy = fbm(nx + 1.3, ny + 2.8, 2, 0.5, 2.0, noiseHeight);
-
-        // Displace the coordinate
-        nx += 4.0 * qx * 0.5;
-        ny += 4.0 * qy * 0.5;
-      }
-
-      let rawE = fbm(nx, ny, octaves, 0.5, 2.0, noiseHeight);
-      const nE = (rawE + 1) / 2; // 0..1
-
-      // 2. Map 0..1 to -10..10
-      let h = 0;
-      if (nE < 0.4) {
-        h = -10 + (nE / 0.4) * 16;
-      } else {
-        h = 6 + ((nE - 0.4) / 0.6) * 4;
-      }
-
-      // 3. Temperature (Standard 0..1)
-      // Same logic: Scale then Offset.
-      // Note: Temp uses the same offset logic to stay aligned, plus its own large constant shift (1000) for variety.
-      // We must scale the offset by the frequency ratio (0.15) if we want it to move at the same relative visual speed,
-      // OR we just use the same world coordinate system (simplest) but with different noise seed/offset.
-
-      // Let's use the exact same logic structure so "Zoom" affects them identically.
-      // nTx = (x * freq * 0.15) + (Offset + 1000) * 0.15 ???
-      // No, let's keep it simple: Temp is just a different layer on the same world.
-
-      let nTx = (x * tempFrequency) + (worldOffsetX * 0.15) + 1000;
-      let nTy = (y * tempFrequency) + (worldOffsetY * 0.15) + 1000;
-
-      if (useWarp) {
-        const qx = fbm(nTx, nTy, 2, 0.5, 2.0, noiseHeight);
-        const qy = fbm(nTx + 10, nTy + 10, 2, 0.5, 2.0, noiseHeight);
-        nTx += 2.0 * qx;
-        nTy += 2.0 * qy;
-      }
-
-      let rawT = fbm(nTx, nTy, 2, 0.5, 2.0, noiseTemp);
-      const t = (rawT + 1) / 2;
-
-      // Determine Biome
-      const biomeIndex = getBiomeIndex(h, t);
-
-      // Texture Mapping
-      // Use UNWARPED noise Coordinates for tiling
-      // This ensures texture scales with zoom (locks to terrain size) but does NOT distort/swirl with the warp effect
-      const texScale = 64.0;
-
-      const worldX = Math.floor(unwarpedNx * texScale);
-      const worldY = Math.floor(unwarpedNy * texScale);
-
-      // Simple positive modulo
-      const tileX = ((worldX % spriteSize) + spriteSize) % spriteSize;
-      const tileY = ((worldY % spriteSize) + spriteSize) % spriteSize;
-
-      // Grid Layout Logic (5 columns)
-      const col = biomeIndex % spritesPerRow;
-      const row = Math.floor(biomeIndex / spritesPerRow);
-
-      const srcX = Math.floor(col * spriteSize + tileX);
-      const srcY = Math.floor(row * spriteSize + tileY);
-
-      // Read from textureData
-      const srcIndex = (srcY * texWidth + srcX) * 4;
-
-      // Write to outputData
-      const paramIndex = (y * WIDTH + x) * 4;
-
-      // Copy RGBA
-      if (srcIndex < terrainData.length && srcIndex >= 0) {
-        outputData[paramIndex] = terrainData[srcIndex];
-        outputData[paramIndex + 1] = terrainData[srcIndex + 1];
-        outputData[paramIndex + 2] = terrainData[srcIndex + 2];
-        outputData[paramIndex + 3] = 255; // Alpha
-      }
-    }
+  if (canvas.width !== renderWidth || canvas.height !== renderHeight) {
+    canvas.width = renderWidth;
+    canvas.height = renderHeight;
   }
 
-  ctx.putImageData(canvasData, 0, 0);
-}
+  // Clear canvas
+  ctx.clearRect(0, 0, renderWidth, renderHeight);
+  // Turn off smoothing for crisp pixel art
+  ctx.imageSmoothingEnabled = false;
 
-// Initial Generation - Managed by Image OnLoad
+  // 3. Generate Data (Pass 1 & 2)
+  const terrainData = generateTerrainData(
+    visibleTiles,
+    userOffset,
+    useWarp,
+    noiseHeight,
+    noiseTemp
+  );
+
+  // 4. Render (Pass 3)
+  renderMap(ctx, terrainImage, terrainData);
+}
 
 // Event Listeners
 scaleInput.addEventListener('input', generate);
@@ -258,7 +76,7 @@ warpInput.addEventListener('change', generate);
 regenerateBtn.addEventListener('click', () => {
   noiseHeight = new PerlinNoise();
   noiseTemp = new PerlinNoise();
-  generate(); // Note: animation removed to keep simple logic intact with ImageData
+  generate();
 
   canvas.style.transform = 'scale(0.95)';
   setTimeout(() => canvas.style.transform = 'scale(1)', 100);
