@@ -189,7 +189,13 @@ function moveSteve(dx: number, dy: number) {
   } else {
     // Normal Movement
     console.log(`WALKING: Current Biome (${biomeIndex}) -> Target Biome (${targetBiomeIndex})`);
-    const speed = BIOME_MOVEMENT_SPEEDS[biomeIndex] || 1.0;
+    let speed = BIOME_MOVEMENT_SPEEDS[biomeIndex] || 1.0;
+
+    // Shift boost
+    if (pressedKeys.has('Shift')) {
+      speed *= 1.5;
+    }
+
     duration = baseDelay / speed;
   }
 

@@ -30,15 +30,15 @@ export const BIOME_MOVEMENT_SPEEDS = {
     [BIOMES.snow]: 0.5,
     [BIOMES.snowyMountain]: 0.5,
 
-    [BIOMES.beach]: 0.6,
-    [BIOMES.desert]: 0.6,
-    [BIOMES.badlands]: 0.6,
+    [BIOMES.beach]: 0.5,
+    [BIOMES.desert]: 0.5,
+    [BIOMES.badlands]: 0.5,
 
-    [BIOMES.grass]: 0.7,
-    [BIOMES.forest]: 0.7,
-    [BIOMES.jungle]: 0.7,
-    [BIOMES.savanna]: 0.7,
-    [BIOMES.mountain]: 0.7,
+    [BIOMES.grass]: 0.6,
+    [BIOMES.forest]: 0.6,
+    [BIOMES.jungle]: 0.6,
+    [BIOMES.savanna]: 0.6,
+    [BIOMES.mountain]: 0.6,
 };
 
 export const BIOME_FILENAMES = {
