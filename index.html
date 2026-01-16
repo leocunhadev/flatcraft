@@ -44,13 +44,18 @@
 
 
         <div class="dpad-container">
-          <div class="dpad-row">
-            <button class="dpad-btn" id="moveUp">▲</button>
-          </div>
-          <div class="dpad-row">
-            <button class="dpad-btn" id="moveLeft">◀</button>
-            <button class="dpad-btn" id="moveDown">▼</button>
-            <button class="dpad-btn" id="moveRight">▶</button>
+          <div class="dpad-grid">
+            <button class="dpad-btn diag" id="moveUL" title="Up Left">↖</button>
+            <button class="dpad-btn" id="moveUp" title="Up">▲</button>
+            <button class="dpad-btn diag" id="moveUR" title="Up Right">↗</button>
+
+            <button class="dpad-btn" id="moveLeft" title="Left">◀</button>
+            <button class="dpad-btn" id="moveDown" title="Down">▼</button>
+            <button class="dpad-btn" id="moveRight" title="Right">▶</button>
+
+            <button class="dpad-btn diag" id="moveDL" title="Down Left">↙</button>
+            <button class="dpad-btn spacer"></button>
+            <button class="dpad-btn diag" id="moveDR" title="Down Right">↘</button>
           </div>
         </div>
       </div>

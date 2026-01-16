@@ -202,15 +202,41 @@ document.getElementById('moveDown')?.addEventListener('click', () => moveSteve(0
 document.getElementById('moveLeft')?.addEventListener('click', () => moveSteve(-1, 0));
 document.getElementById('moveRight')?.addEventListener('click', () => moveSteve(1, 0));
 
-// Keyboard support
+document.getElementById('moveUL')?.addEventListener('click', () => moveSteve(-1, -1));
+document.getElementById('moveUR')?.addEventListener('click', () => moveSteve(1, -1));
+document.getElementById('moveDL')?.addEventListener('click', () => moveSteve(-1, 1));
+document.getElementById('moveDR')?.addEventListener('click', () => moveSteve(1, 1));
+
+// Keyboard support with multi-key tracking
+const pressedKeys = new Set<string>();
+
 window.addEventListener('keydown', (e) => {
-  switch (e.key) {
-    case 'ArrowUp': moveSteve(0, -1); break;
-    case 'ArrowDown': moveSteve(0, 1); break;
-    case 'ArrowLeft': moveSteve(-1, 0); break;
-    case 'ArrowRight': moveSteve(1, 0); break;
-  }
+  pressedKeys.add(e.key);
+  processInput();
 });
+
+window.addEventListener('keyup', (e) => {
+  pressedKeys.delete(e.key);
+});
+
+function processInput() {
+  if (!steve.isReadyToMove()) return;
+
+  let dx = 0;
+  let dy = 0;
+
+  if (pressedKeys.has('ArrowUp') || pressedKeys.has('w')) dy -= 1;
+  if (pressedKeys.has('ArrowDown') || pressedKeys.has('s')) dy += 1;
+  if (pressedKeys.has('ArrowLeft') || pressedKeys.has('a')) dx -= 1;
+  if (pressedKeys.has('ArrowRight') || pressedKeys.has('d')) dx += 1;
+
+  if (dx !== 0 || dy !== 0) {
+    moveSteve(dx, dy);
+  }
+}
+
+// Continuous check for held keys
+setInterval(processInput, 50);
 
 // Event Listeners
 scaleInput.addEventListener('input', generate);
