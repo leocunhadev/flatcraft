@@ -1,109 +1,54 @@
-import './style.css'
-import { PerlinNoise } from './perlin'
-import { TILE_SIZE, BIOME_MOVEMENT_SPEEDS, CLIMB_DURATION, CLIMBABLE_BIOMES, BIOME_FILENAMES } from './config';
-import { generateTerrainData, type TerrainData } from './generation';
-import { renderMap } from './renderer';
-import { getAtmosphericLight, renderShadows } from './lighting';
-import { Steve } from './steve';
-import { getBiomeIndex } from './biomes';
+import './style/style.css'
+import { TILE_SIZE, BIOME_MOVEMENT_SPEEDS, CLIMB_DURATION, CLIMBABLE_BIOMES } from './config/config';
+import { WorldManager, type TerrainData } from './core/generation';
+import { renderMap } from './rendering/renderer';
+import { getAtmosphericLight, renderShadows } from './rendering/lighting';
+import { Steve } from './entities/steve';
+import { getBiomeIndex } from './core/biomes';
+import { AssetLoader } from './systems/assets';
+import { InputManager } from './systems/input';
 
+// Elements
 const canvas = document.getElementById('mapCanvas') as HTMLCanvasElement;
 const ctx = canvas.getContext('2d')!;
 const regenerateBtn = document.getElementById('regenerateBtn') as HTMLButtonElement;
 const scaleInput = document.getElementById('scaleInput') as HTMLInputElement;
 const seedInput = document.getElementById('seedInput') as HTMLInputElement;
 
-// Terrain Cache & Lighting
+// Terrain Cache & Core State
 const terrainCanvas = document.createElement('canvas');
 const terrainCtx = terrainCanvas.getContext('2d')!;
-let gameTime = 12; // 0-24h cycle
+let gameTime = 12;
 const DAY_SPEED = 0.0025;
 
-// Initialize Noise Layers
-let noiseHeight = new PerlinNoise();
-let noiseTemp = new PerlinNoise();
-let noiseMoisture = new PerlinNoise();
+const worldManager = new WorldManager();
+const assets = new AssetLoader(() => checkLoadAndGenerate());
+const input = new InputManager(canvas);
 
-// Texture Management
+// Steve
+const steve = new Steve(1000, 1000, () => checkLoadAndGenerate());
 
-const biomeTextures: Record<number, HTMLImageElement> = {};
-let terrainDataLoaded = false;
-
-// Load images using Vite's glob import
-// @ts-ignore
-const images = import.meta.glob('./imagens/*.{png,jpg,jpeg}', { eager: true, as: 'url' });
-
-let pendingImages = 0;
-
-
-Object.entries(BIOME_FILENAMES).forEach(([idStr, filename]) => {
-  const id = parseInt(idStr);
-  const key = `./imagens/${filename}`;
-  // @ts-ignore
-  const src = images[key];
-
-  if (src) {
-    pendingImages++;
-    const img = new Image();
-    img.onload = () => {
-      pendingImages--;
-      if (pendingImages === 0) {
-        terrainDataLoaded = true;
-        checkLoadAndGenerate();
-      }
-    };
-    img.onerror = () => {
-      console.error(`Failed to load: ${filename}`);
-      pendingImages--;
-      if (pendingImages === 0) {
-        terrainDataLoaded = true;
-        checkLoadAndGenerate();
-      }
-    };
-    img.src = src;
-    biomeTextures[id] = img;
-  } else {
-    console.warn(`Image definition missing for biome ${id}: ${filename}`);
-  }
-});
-
-// Initialize Steve
-const steve = new Steve(1000, 1000, () => {
-  checkLoadAndGenerate();
-});
-
+// Game State
 let currentTerrainData: TerrainData | null = null;
-// Screen Coordinates (Calculated)
 let centerScreenX = 0;
 let centerScreenY = 0;
 
 function checkLoadAndGenerate() {
-  if (terrainDataLoaded && steve.loaded) {
+  if (assets.isLoaded && steve.loaded) {
     generate();
   }
 }
 
 function generate() {
-  if (!terrainDataLoaded || !steve.loaded) return;
+  if (!assets.isLoaded || !steve.loaded) return;
 
-  // 1. Gather Inputs
+  // 1. Zoom/Canvas Sizing
   const visibleTilesInput = parseInt(scaleInput.value);
-  const tilesY = Math.max(4, visibleTilesInput); // Base zoom on vertical height
-
-  // Get container aspect ratio
-  // We use the canvas's current display size (which fills the container)
-  // If canvas is hidden or 0, fallback to square.
-  let aspect = 1;
+  const tilesY = Math.max(4, visibleTilesInput);
   const rect = canvas.getBoundingClientRect();
-  if (rect.width > 0 && rect.height > 0) {
-    aspect = rect.width / rect.height;
-  }
-
+  const aspect = (rect.width > 0 && rect.height > 0) ? rect.width / rect.height : 1;
   const tilesX = Math.round(tilesY * aspect);
 
-  const useWarp = true; // Default to connected oceans
-
-  // 2. Resize Canvas Buffer
   const renderWidth = tilesX * TILE_SIZE;
   const renderHeight = tilesY * TILE_SIZE;
 
@@ -114,228 +59,139 @@ function generate() {
     terrainCanvas.height = renderHeight;
   }
 
-  // Clear buffers
   ctx.clearRect(0, 0, renderWidth, renderHeight);
   terrainCtx.clearRect(0, 0, renderWidth, renderHeight);
-
-  // Turn off smoothing for crisp pixel art
   ctx.imageSmoothingEnabled = false;
   terrainCtx.imageSmoothingEnabled = false;
 
-  // 3. Generate Data
-  // Calculate Map Origin based on Player Position (Centering Logic)
+  // 2. World Generation
   const mapOriginX = steve.worldX - Math.floor(tilesX / 2);
   const mapOriginY = steve.worldY - Math.floor(tilesY / 2);
-
-  // Store center for rendering Steve
   centerScreenX = steve.worldX - mapOriginX;
   centerScreenY = steve.worldY - mapOriginY;
 
-  currentTerrainData = generateTerrainData(
-    tilesX,
-    tilesY,
-    mapOriginX,
-    mapOriginY,
-    useWarp,
-    noiseHeight,
-    noiseTemp,
-    noiseMoisture
-  );
+  currentTerrainData = worldManager.generate(tilesX, tilesY, mapOriginX, mapOriginY, true);
 
-  // Cache terrain rendering
-  renderMap(terrainCtx, biomeTextures, currentTerrainData);
-
+  // 3. Render Terrain to Cache
+  renderMap(terrainCtx, assets.biomeTextures, currentTerrainData);
   draw();
 }
 
 function draw() {
   if (!currentTerrainData) return;
 
-  // Draw Cached Map
+  // Update Steve's Mouse Angle from Input
+  const steveCanvasX = centerScreenX * TILE_SIZE + TILE_SIZE / 2;
+  const steveCanvasY = centerScreenY * TILE_SIZE + TILE_SIZE / 2;
+  steve.mouseAngle = Math.atan2(input.lastMouseBufferY - steveCanvasY, input.lastMouseBufferX - steveCanvasX);
+
+  // Composite Frame
   ctx.drawImage(terrainCanvas, 0, 0);
-
-  // Dynamic Shadows based on Sun position
   renderShadows(ctx, currentTerrainData.tilesX, currentTerrainData.tilesY, gameTime);
-
-  // Draw Steve at Center Screen
   steve.render(ctx, centerScreenX, centerScreenY);
 
-  // Atmospheric Lighting System (Timeline)
+  // Atmosphere
   const light = getAtmosphericLight(gameTime);
-
   if (light.a > 0.01) {
     ctx.fillStyle = `rgba(${light.r}, ${light.g}, ${light.b}, ${light.a})`;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
   }
 }
 
-// Controls
-// Controls
 function moveSteve(dx: number, dy: number) {
-  if (!currentTerrainData) return;
+  if (!currentTerrainData || !steve.isReadyToMove()) return;
 
-  if (!steve.isReadyToMove()) return;
-
-  // Center Index (Steve's current position)
   const cx = currentTerrainData.tilesX >> 1;
   const cy = currentTerrainData.tilesY >> 1;
-  const centerIndex = cy * currentTerrainData.tilesX + cx;
+  const targetX = cx + dx;
+  const targetY = cy + dy;
 
-  // Target Index (Where Steve is going)
-  // Since we have a buffer, +/- 1 tile is safe
-  const tx = cx + dx;
-  const ty = cy + dy;
-  const targetIndex = ty * currentTerrainData.tilesX + tx;
+  if (targetX < 0 || targetX >= currentTerrainData.tilesX || targetY < 0 || targetY >= currentTerrainData.tilesY) return;
 
-  // Current Biome
-  const h = currentTerrainData.heightMap[centerIndex];
-  const t = currentTerrainData.tempMap[centerIndex];
-  const m = currentTerrainData.moistureMap[centerIndex];
-  const biomeIndex = getBiomeIndex(h, t, m);
+  const centerIdx = cy * currentTerrainData.tilesX + cx;
+  const targetIdx = targetY * currentTerrainData.tilesX + targetX;
 
-  // Target Biome
-  const h2 = currentTerrainData.heightMap[targetIndex];
-  const t2 = currentTerrainData.tempMap[targetIndex];
-  const m2 = currentTerrainData.moistureMap[targetIndex];
-  const targetBiomeIndex = getBiomeIndex(h2, t2, m2);
+  const getBiome = (idx: number) => {
+    const h = currentTerrainData!.heightMap[idx];
+    const t = currentTerrainData!.tempMap[idx];
+    const m = currentTerrainData!.moistureMap[idx];
+    return getBiomeIndex(h, t, m);
+  };
 
-  // LOGIC: Movement Speed & Climbing
-  const baseDelay = 150; // default base
-  let duration = baseDelay;
+  const currentBiome = getBiome(centerIdx);
+  const targetBiome = getBiome(targetIdx);
 
-  // Check Climbing: Moving from non-climbable TO climbable
-  const isTargetClimbable = CLIMBABLE_BIOMES.includes(targetBiomeIndex);
-  const isCurrentClimbable = CLIMBABLE_BIOMES.includes(biomeIndex);
+  let duration = 150;
+  const isClimb = CLIMBABLE_BIOMES.includes(targetBiome) && !CLIMBABLE_BIOMES.includes(currentBiome);
 
-  const isClimb = isTargetClimbable && !isCurrentClimbable;
   if (isClimb) {
-    console.log(`CLIMB UP: Current Biome (${biomeIndex}) -> Target Biome (${targetBiomeIndex})`);
     duration = CLIMB_DURATION;
   } else {
-    // Normal Movement
-    console.log(`WALKING: Current Biome (${biomeIndex}) -> Target Biome (${targetBiomeIndex})`);
-    let speed = BIOME_MOVEMENT_SPEEDS[biomeIndex] || 1.0;
-
-    // Shift boost
-    if (pressedKeys.has('Shift')) {
-      speed *= 1.5;
-    }
-
-    duration = baseDelay / speed;
+    let speed = BIOME_MOVEMENT_SPEEDS[currentBiome] || 1.0;
+    if (input.isShiftPressed()) speed *= 1.5;
+    duration = 150 / speed;
   }
 
   steve.move(dx, dy, duration, isClimb);
-  generate(); // Regenerate map around new position
+  generate();
 
-  if (isClimb) {
-    requestAnimationFrame(animationLoop);
-  }
+  if (isClimb) requestAnimationFrame(animationLoop);
 }
 
 function animationLoop() {
   draw();
-  if (!steve.isReadyToMove()) {
-    requestAnimationFrame(animationLoop);
-  }
+  if (!steve.isReadyToMove()) requestAnimationFrame(animationLoop);
 }
 
-document.getElementById('moveUp')?.addEventListener('click', () => moveSteve(0, -1));
-document.getElementById('moveDown')?.addEventListener('click', () => moveSteve(0, 1));
-document.getElementById('moveLeft')?.addEventListener('click', () => moveSteve(-1, 0));
-document.getElementById('moveRight')?.addEventListener('click', () => moveSteve(1, 0));
-
-document.getElementById('moveUL')?.addEventListener('click', () => moveSteve(-1, -1));
-document.getElementById('moveUR')?.addEventListener('click', () => moveSteve(1, -1));
-document.getElementById('moveDL')?.addEventListener('click', () => moveSteve(-1, 1));
-document.getElementById('moveDR')?.addEventListener('click', () => moveSteve(1, 1));
-
-// Keyboard support with multi-key tracking
-const pressedKeys = new Set<string>();
-
-window.addEventListener('keydown', (e) => {
-  pressedKeys.add(e.key);
-  processInput();
-});
-
-window.addEventListener('keyup', (e) => {
-  pressedKeys.delete(e.key);
-});
-
 function processInput() {
-  if (!steve.isReadyToMove()) return;
+  const { dx, dy } = input.getDirection();
 
-  let dx = 0;
-  let dy = 0;
+  if (dx === 0 && dy === 0) {
+    if (steve.lastDx !== 0 || steve.lastDy !== 0) {
+      steve.lastDx = 0;
+      steve.lastDy = 0;
+    }
+    return;
+  }
 
-  if (pressedKeys.has('ArrowUp') || pressedKeys.has('w')) dy -= 1;
-  if (pressedKeys.has('ArrowDown') || pressedKeys.has('s')) dy += 1;
-  if (pressedKeys.has('ArrowLeft') || pressedKeys.has('a')) dx -= 1;
-  if (pressedKeys.has('ArrowRight') || pressedKeys.has('d')) dx += 1;
+  const isNewDirection = (dx !== steve.lastDx || dy !== steve.lastDy);
 
-  if (dx !== 0 || dy !== 0) {
+  if (steve.isReadyToMove() || isNewDirection) {
     moveSteve(dx, dy);
   }
 }
 
-// Continuous loop
 function gameLoop() {
   gameTime = (gameTime + DAY_SPEED) % 24;
   processInput();
   draw();
   requestAnimationFrame(gameLoop);
 }
-requestAnimationFrame(gameLoop);
 
-// Event Listeners
-canvas.addEventListener('mousemove', (e) => {
-  const rect = canvas.getBoundingClientRect();
-  const mouseX = e.clientX - rect.left;
-  const mouseY = e.clientY - rect.top;
+// UI Event Listeners
+const attachClick = (id: string, dx: number, dy: number) => {
+  document.getElementById(id)?.addEventListener('click', () => moveSteve(dx, dy));
+};
 
-  // Scale mouse coordinates to canvas buffer coordinates
-  const scaleX = canvas.width / rect.width;
-  const scaleY = canvas.height / rect.height;
-
-  const bufferMouseX = mouseX * scaleX;
-  const bufferMouseY = mouseY * scaleY;
-
-  // Steve center in canvas buffer pixels
-  const steveCanvasX = centerScreenX * TILE_SIZE + TILE_SIZE / 2;
-  const steveCanvasY = centerScreenY * TILE_SIZE + TILE_SIZE / 2;
-
-  steve.mouseAngle = Math.atan2(bufferMouseY - steveCanvasY, bufferMouseX - steveCanvasX);
-  draw(); // Redraw to update arm
-});
+attachClick('moveUp', 0, -1);
+attachClick('moveDown', 0, 1);
+attachClick('moveLeft', -1, 0);
+attachClick('moveRight', 1, 0);
+attachClick('moveUL', -1, -1);
+attachClick('moveUR', 1, -1);
+attachClick('moveDL', -1, 1);
+attachClick('moveDR', 1, 1);
 
 scaleInput.addEventListener('input', generate);
-
-// Debounced resize listener
-let resizeTimeout: number;
-window.addEventListener('resize', () => {
-  clearTimeout(resizeTimeout);
-  resizeTimeout = setTimeout(generate, 100);
-});
+window.addEventListener('resize', () => generate()); // Simple resize for now
 
 regenerateBtn.addEventListener('click', () => {
-  const seedString = seedInput.value.trim();
-  let seedVal: number | undefined;
-
-  if (seedString !== "") {
-    // Simple hash to convert string to number
-    let hash = 0;
-    for (let i = 0; i < seedString.length; i++) {
-      const char = seedString.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
-      hash = hash & hash; // Convert to 32bit integer
-    }
-    seedVal = hash;
-  }
-
-  noiseHeight = new PerlinNoise(seedVal);
-  noiseTemp = new PerlinNoise(seedVal ? seedVal + 12345 : undefined);
-  noiseMoisture = new PerlinNoise(seedVal ? seedVal + 54321 : undefined);
+  worldManager.setSeed(seedInput.value.trim());
   generate();
-
   canvas.style.transform = 'scale(0.95)';
   setTimeout(() => canvas.style.transform = 'scale(1)', 100);
 });
+
+// Start
+requestAnimationFrame(gameLoop);
+checkLoadAndGenerate();

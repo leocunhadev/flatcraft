@@ -1,4 +1,4 @@
-import { BIOMES } from './config';
+import { BIOMES } from '../config/config';
 
 export function getBiomeIndex(elevation: number, temperature: number, moisture: number): number {
     // Elevation range: [-10, 10]

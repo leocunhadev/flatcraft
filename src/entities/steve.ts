@@ -1,6 +1,6 @@
-import steveUrl from './imagens/steve.jpeg';
-import armUrl from './imagens/arm.png';
-import { renderCharacter, renderArm } from './renderer';
+import steveUrl from '../imagens/steve.jpeg';
+import armUrl from '../imagens/arm.png';
+import { renderCharacter, renderArm } from '../rendering/renderer';
 
 export class Steve {
     public worldX: number;
@@ -37,16 +37,31 @@ export class Steve {
         this.armImage.src = armUrl;
     }
 
+    public lastDx: number = 0;
+    public lastDy: number = 0;
+
     public isReadyToMove(): boolean {
         return Date.now() >= this.nextMoveTime;
     }
 
     public move(dx: number, dy: number, duration: number, isClimb: boolean = false) {
+        const now = Date.now();
+        let remaining = 0;
+
+        // If interrupting an ongoing move, carry over the penalty
+        if (now < this.nextMoveTime) {
+            remaining = this.nextMoveTime - now;
+        }
+
         this.worldX += dx;
         this.worldY += dy;
-        this.startMoveTime = Date.now();
+        this.lastDx = dx;
+        this.lastDy = dy;
+
+        this.startMoveTime = now;
         this.moveDuration = duration;
-        this.nextMoveTime = this.startMoveTime + duration;
+        // The next move is delayed by the duration PLUS any remaining time from the previous block
+        this.nextMoveTime = now + duration + remaining;
         this.isClimbing = isClimb;
     }
 

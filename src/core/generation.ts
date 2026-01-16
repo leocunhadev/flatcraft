@@ -1,5 +1,5 @@
-import { fbm } from './utils';
-import { PerlinNoise } from './perlin';
+import { fbm } from '../utils/utils';
+import { PerlinNoise } from '../utils/perlin';
 
 const WATER_LEVEL = 6.0;
 
@@ -9,6 +9,55 @@ export interface TerrainData {
     moistureMap: Float32Array;
     tilesX: number;
     tilesY: number;
+}
+
+export class WorldManager {
+    public noiseHeight: PerlinNoise;
+    public noiseTemp: PerlinNoise;
+    public noiseMoisture: PerlinNoise;
+
+    constructor() {
+        this.noiseHeight = new PerlinNoise();
+        this.noiseTemp = new PerlinNoise();
+        this.noiseMoisture = new PerlinNoise();
+    }
+
+    public setSeed(seed: string) {
+        let seedVal: number | undefined;
+
+        if (seed !== "") {
+            let hash = 0;
+            for (let i = 0; i < seed.length; i++) {
+                const char = seed.charCodeAt(i);
+                hash = ((hash << 5) - hash) + char;
+                hash = hash & hash;
+            }
+            seedVal = hash;
+        }
+
+        this.noiseHeight = new PerlinNoise(seedVal);
+        this.noiseTemp = new PerlinNoise(seedVal ? seedVal + 12345 : undefined);
+        this.noiseMoisture = new PerlinNoise(seedVal ? seedVal + 54321 : undefined);
+    }
+
+    public generate(
+        tilesX: number,
+        tilesY: number,
+        offsetX: number,
+        offsetY: number,
+        useWarp: boolean
+    ): TerrainData {
+        return generateTerrainData(
+            tilesX,
+            tilesY,
+            offsetX,
+            offsetY,
+            useWarp,
+            this.noiseHeight,
+            this.noiseTemp,
+            this.noiseMoisture
+        );
+    }
 }
 
 export function generateTerrainData(
