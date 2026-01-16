@@ -7,6 +7,8 @@ import { Steve } from './entities/steve';
 import { getBiomeIndex } from './core/biomes';
 import { AssetLoader } from './systems/assets';
 import { InputManager } from './systems/input';
+import { HUDManager } from './systems/hud';
+import { SurvivalSystem } from './systems/survival';
 
 // Elements
 const canvas = document.getElementById('mapCanvas') as HTMLCanvasElement;
@@ -24,6 +26,8 @@ const DAY_SPEED = 0.0025;
 const worldManager = new WorldManager();
 const assets = new AssetLoader(() => checkLoadAndGenerate());
 const input = new InputManager(canvas);
+const hud = new HUDManager();
+const survival = new SurvivalSystem();
 
 // Steve
 const steve = new Steve(1000, 1000, () => checkLoadAndGenerate());
@@ -175,10 +179,14 @@ function processInput() {
 function gameLoop() {
   gameTime = (gameTime + DAY_SPEED) % 24;
 
-  // Update Steve sinking state
+  // Update Steve sinking and survival state
   const { dx, dy } = input.getDirection();
   steve.isIdleInWater = (dx === 0 && dy === 0);
   steve.update();
+
+  if (survival.update(steve.isInWater, steve.isIdleInWater)) {
+    hud.update(survival.airLevel, survival.healthLevel);
+  }
 
   processInput();
   draw();
@@ -208,33 +216,6 @@ regenerateBtn.addEventListener('click', () => {
   canvas.style.transform = 'scale(0.95)';
   setTimeout(() => canvas.style.transform = 'scale(1)', 100);
 });
-
-// Initialize DOM HUD
-function initHUD() {
-  const heartsRow = document.getElementById('heartsRow');
-  const foodRow = document.getElementById('foodRow');
-  const bubblesRow = document.getElementById('bubblesRow');
-
-  if (heartsRow && foodRow && bubblesRow) {
-    for (let i = 0; i < 10; i++) {
-      const heart = document.createElement('div');
-      heart.className = 'hud-icon heart';
-      heartsRow.appendChild(heart);
-
-      const food = document.createElement('img');
-      food.src = '/food_pixel.png';
-      food.className = 'hud-icon';
-      foodRow.appendChild(food);
-
-      const bubble = document.createElement('img');
-      bubble.src = '/bubble_pixel.png';
-      bubble.className = 'hud-icon';
-      bubblesRow.appendChild(bubble);
-    }
-  }
-}
-
-initHUD();
 
 // Start
 requestAnimationFrame(gameLoop);
