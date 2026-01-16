@@ -15,8 +15,8 @@ export const LIGHTING_TIMELINE: LightingStep[] = [
     { hour: 3, r: 10, g: 15, b: 45, a: 0.8 },
     { hour: 4, r: 10, g: 15, b: 45, a: 0.7 },
     { hour: 5, r: 30, g: 20, b: 60, a: 0.6 },  // Dawn
-    { hour: 6, r: 255, g: 140, b: 50, a: 0.35 }, // Sunrise (Golden Hour)
-    { hour: 7, r: 255, g: 140, b: 50, a: 0.15 },
+    { hour: 6, r: 255, g: 140, b: 50, a: 0.2 }, // Sunrise (Golden Hour)
+    { hour: 7, r: 255, g: 140, b: 50, a: 0.1 },
     { hour: 8, r: 255, g: 255, b: 255, a: 0.0 },  // Morning
     { hour: 9, r: 255, g: 255, b: 255, a: 0.0 },
     { hour: 10, r: 255, g: 255, b: 255, a: 0.0 },
@@ -26,8 +26,8 @@ export const LIGHTING_TIMELINE: LightingStep[] = [
     { hour: 14, r: 255, g: 255, b: 255, a: 0.0 },
     { hour: 15, r: 255, g: 255, b: 255, a: 0.0 },
     { hour: 16, r: 255, g: 255, b: 255, a: 0.0 },
-    { hour: 17, r: 255, g: 80, b: 20, a: 0.4 },  // Sunset (Golden Hour)
-    { hour: 18, r: 255, g: 80, b: 20, a: 0.5 },
+    { hour: 17, r: 255, g: 80, b: 20, a: 0.2 },  // Sunset (Golden Hour)
+    { hour: 18, r: 255, g: 80, b: 20, a: 0.25 },
     { hour: 19, r: 40, g: 20, b: 80, a: 0.6 },  // Dusk
     { hour: 20, r: 40, g: 20, b: 80, a: 0.65 },
     { hour: 21, r: 40, g: 20, b: 80, a: 0.7 },
