@@ -11,6 +11,7 @@ const canvas = document.getElementById('mapCanvas') as HTMLCanvasElement;
 const ctx = canvas.getContext('2d')!;
 const regenerateBtn = document.getElementById('regenerateBtn') as HTMLButtonElement;
 const scaleInput = document.getElementById('scaleInput') as HTMLInputElement;
+const seedInput = document.getElementById('seedInput') as HTMLInputElement;
 
 
 // Initialize Noise Layers
@@ -149,8 +150,22 @@ window.addEventListener('resize', () => {
 });
 
 regenerateBtn.addEventListener('click', () => {
-  noiseHeight = new PerlinNoise();
-  noiseTemp = new PerlinNoise();
+  const seedString = seedInput.value.trim();
+  let seedVal: number | undefined;
+
+  if (seedString !== "") {
+    // Simple hash to convert string to number
+    let hash = 0;
+    for (let i = 0; i < seedString.length; i++) {
+      const char = seedString.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32bit integer
+    }
+    seedVal = hash;
+  }
+
+  noiseHeight = new PerlinNoise(seedVal);
+  noiseTemp = new PerlinNoise(seedVal ? seedVal + 12345 : undefined); // Offset temp noise so it differs from height
   generate();
 
   canvas.style.transform = 'scale(0.95)';

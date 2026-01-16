@@ -1,18 +1,28 @@
+import { SeededRandom } from './utils';
+
 export class PerlinNoise {
   private permutation: number[];
 
-  constructor() {
-    this.permutation = this.generatePermutation();
+  constructor(seed?: number) {
+    this.permutation = this.generatePermutation(seed);
   }
 
-  private generatePermutation(): number[] {
+  private generatePermutation(seed?: number): number[] {
     const p = [];
     for (let i = 0; i < 256; i++) {
       p[i] = i;
     }
+
+    // If seed is provided, use SeededRandom, otherwise use Math.random
+    let randomFunc = Math.random;
+    if (seed !== undefined) {
+      const rng = new SeededRandom(seed);
+      randomFunc = () => rng.next();
+    }
+
     // Shuffle
     for (let i = 255; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
+      const j = Math.floor(randomFunc() * (i + 1));
       [p[i], p[j]] = [p[j], p[i]];
     }
     // Duplicate for overflow handling
