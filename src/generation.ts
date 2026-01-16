@@ -58,7 +58,7 @@ export function generateTerrainData(
             let h = 0;
             // Smoother mapping for elevation
             // We want 50% water roughly.
-            if (nE < 0.5) {
+            if (nE < 0.8) {
                 // Map [0, 0.5] to [-10, 6]
                 h = -10 + (nE / 0.5) * 16;
             } else {
