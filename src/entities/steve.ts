@@ -15,6 +15,7 @@ export class Steve {
     private startMoveTime: number = 0;
     private moveDuration: number = 0;
     private isClimbing: boolean = false;
+    private isDescending: boolean = false;
 
     constructor(initialX: number, initialY: number, onLoad: () => void) {
         this.worldX = initialX;
@@ -44,7 +45,7 @@ export class Steve {
         return Date.now() >= this.nextMoveTime;
     }
 
-    public move(dx: number, dy: number, duration: number, isClimb: boolean = false) {
+    public move(dx: number, dy: number, duration: number, isClimb: boolean = false, isDescend: boolean = false) {
         const now = Date.now();
         let remaining = 0;
 
@@ -63,20 +64,25 @@ export class Steve {
         // The next move is delayed by the duration PLUS any remaining time from the previous block
         this.nextMoveTime = now + duration + remaining;
         this.isClimbing = isClimb;
+        this.isDescending = isDescend;
     }
 
     public render(ctx: CanvasRenderingContext2D, screenX: number, screenY: number) {
         if (!this.loaded || !this.armLoaded) return;
 
         let scale = 1.0;
-        if (this.isClimbing && Date.now() < this.nextMoveTime) {
+        if (Date.now() < this.nextMoveTime) {
             const elapsed = Date.now() - this.startMoveTime;
-            const progress = elapsed / this.moveDuration;
-
-            // "Breath" animation: increases and then decreases
-            // sin(0 to PI) goes from 0 to 1 back to 0
+            const progress = Math.min(elapsed / this.moveDuration, 1);
             const bounce = Math.sin(progress * Math.PI);
-            scale = 1.0 + (bounce * 0.4); // Increases by up to 40%
+
+            if (this.isClimbing) {
+                // "Breath" animation: increases and then decreases
+                scale = 1.0 + (bounce * 0.4); // Increases by up to 40%
+            } else if (this.isDescending) {
+                // "Descent" animation: shrinks and then returns to normal
+                scale = 1.0 - (bounce * 0.25); // Decreases by up to 25%
+            }
         }
 
         renderCharacter(ctx, this.image, screenX, screenY, scale);

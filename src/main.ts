@@ -123,6 +123,7 @@ function moveSteve(dx: number, dy: number) {
 
   let duration = 150;
   const isClimb = CLIMBABLE_BIOMES.includes(targetBiome) && !CLIMBABLE_BIOMES.includes(currentBiome);
+  const isDescend = !CLIMBABLE_BIOMES.includes(targetBiome) && CLIMBABLE_BIOMES.includes(currentBiome);
 
   if (isClimb) {
     duration = CLIMB_DURATION;
@@ -132,10 +133,10 @@ function moveSteve(dx: number, dy: number) {
     duration = 150 / speed;
   }
 
-  steve.move(dx, dy, duration, isClimb);
+  steve.move(dx, dy, duration, isClimb, isDescend);
   generate();
 
-  if (isClimb) requestAnimationFrame(animationLoop);
+  if (isClimb || isDescend) requestAnimationFrame(animationLoop);
 }
 
 function animationLoop() {
