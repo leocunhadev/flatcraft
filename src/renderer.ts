@@ -58,3 +58,32 @@ export function renderCharacter(
         destX, destY, size, size
     );
 }
+
+export function renderArm(
+    ctx: CanvasRenderingContext2D,
+    armImage: HTMLImageElement,
+    x: number,
+    y: number,
+    angle: number,
+    scale: number = 1.0
+) {
+    const size = TILE_SIZE * scale;
+    // Center point of the Steve tile
+    const centerX = x * TILE_SIZE + TILE_SIZE / 2;
+    const centerY = y * TILE_SIZE + TILE_SIZE / 2;
+
+    ctx.save();
+    ctx.translate(centerX, centerY);
+    ctx.rotate(angle + Math.PI / 2); // Add 90° rotation to orient the arm correctly
+
+    // Draw the arm extending 48px from Steve's center with offset
+    const armOffset = 30; // Distance from Steve's center
+    const armLength = 48;
+    const armThickness = size * 0.3;
+
+    ctx.drawImage(
+        armImage,
+        armOffset, -armThickness / 2, armLength, armThickness
+    );
+    ctx.restore();
+}

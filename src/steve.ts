@@ -1,13 +1,16 @@
 import steveUrl from './imagens/steve.jpeg';
-import { renderCharacter } from './renderer';
+import armUrl from './imagens/arm.png';
+import { renderCharacter, renderArm } from './renderer';
 
 export class Steve {
     public worldX: number;
     public worldY: number;
     public image: HTMLImageElement;
-
+    public armImage: HTMLImageElement;
+    public mouseAngle: number = 0;
 
     public loaded: boolean;
+    public armLoaded: boolean;
     private nextMoveTime: number = 0;
     private startMoveTime: number = 0;
     private moveDuration: number = 0;
@@ -17,13 +20,21 @@ export class Steve {
         this.worldX = initialX;
         this.worldY = initialY;
         this.loaded = false;
+        this.armLoaded = false;
 
         this.image = new Image();
         this.image.onload = () => {
             this.loaded = true;
-            onLoad();
+            if (this.armLoaded) onLoad();
         };
         this.image.src = steveUrl;
+
+        this.armImage = new Image();
+        this.armImage.onload = () => {
+            this.armLoaded = true;
+            if (this.loaded) onLoad();
+        };
+        this.armImage.src = armUrl;
     }
 
     public isReadyToMove(): boolean {
@@ -40,7 +51,7 @@ export class Steve {
     }
 
     public render(ctx: CanvasRenderingContext2D, screenX: number, screenY: number) {
-        if (!this.loaded) return;
+        if (!this.loaded || !this.armLoaded) return;
 
         let scale = 1.0;
         if (this.isClimbing && Date.now() < this.nextMoveTime) {
@@ -54,5 +65,6 @@ export class Steve {
         }
 
         renderCharacter(ctx, this.image, screenX, screenY, scale);
+        renderArm(ctx, this.armImage, screenX, screenY, this.mouseAngle, scale);
     }
 }

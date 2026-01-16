@@ -256,6 +256,26 @@ function processInput() {
 setInterval(processInput, 50);
 
 // Event Listeners
+canvas.addEventListener('mousemove', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const mouseX = e.clientX - rect.left;
+  const mouseY = e.clientY - rect.top;
+
+  // Scale mouse coordinates to canvas buffer coordinates
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+
+  const bufferMouseX = mouseX * scaleX;
+  const bufferMouseY = mouseY * scaleY;
+
+  // Steve center in canvas buffer pixels
+  const steveCanvasX = centerScreenX * TILE_SIZE + TILE_SIZE / 2;
+  const steveCanvasY = centerScreenY * TILE_SIZE + TILE_SIZE / 2;
+
+  steve.mouseAngle = Math.atan2(bufferMouseY - steveCanvasY, bufferMouseX - steveCanvasX);
+  draw(); // Redraw to update arm
+});
+
 scaleInput.addEventListener('input', generate);
 
 // Debounced resize listener
